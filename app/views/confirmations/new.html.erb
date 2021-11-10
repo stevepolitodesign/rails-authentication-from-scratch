@@ -1,0 +1,4 @@
+<%= form_with model: @user, url: confirmations_path do |form| %>
+  <%= form.email_field :email, required: true %>
+  <%= form.submit "Confirm Email" %>
+<% end %>
