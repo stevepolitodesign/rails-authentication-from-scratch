@@ -10,12 +10,17 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2021_11_09_214151) do
+ActiveRecord::Schema.define(version: 2021_11_12_152821) do
 
   create_table "users", force: :cascade do |t|
     t.string "email", null: false
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
+    t.string "confirmation_token", null: false
+    t.datetime "confirmation_sent_at"
+    t.datetime "confirmed_at"
+    t.string "password_digest", null: false
+    t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 
