@@ -1,9 +1,9 @@
 require "test_helper"
 
 class UsersControllerTest < ActionDispatch::IntegrationTest
-  # test "the truth" do
-  #   assert true
-  # end
+  setup do
+    @confirmed_user = User.create!(email: "confirmed_user@example.com", password: "password", password_confirmation: "password", confirmed_at: Time.current)
+  end
 
   test "should load sign up page for anonymous users" do
     get sign_up_path
@@ -11,7 +11,20 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should redirect authenticated users from signing up" do
-    flunk
+    login @confirmed_user
+
+    get sign_up_path
+    assert_redirected_to root_path
+
+    assert_no_difference("User.count") do
+      post sign_up_path, params: {
+        user: {
+          email: "some_unique_email@example.com",
+          password: "password",
+          password_confirmation: "password",
+        }
+      }
+    end
   end
 
   test "should create user and send confirmation instructions" do

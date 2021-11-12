@@ -2,6 +2,7 @@ require "test_helper"
 
 class ConfirmationsControllerTest < ActionDispatch::IntegrationTest
   setup do
+    @confirmed_user = User.create!(email: "confirmed_user@example.com", password: "password", password_confirmation: "password", confirmed_at: 1.week.ago)
     @unconfirmed_user = User.create!(email: "unconfirmed_user@example.com", confirmation_sent_at: Time.current, password: "password", password_confirmation: "password")
   end
 
@@ -58,6 +59,32 @@ class ConfirmationsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should prevent authenticated user from confirming" do
-    flunk
+    freeze_time
+
+    login @confirmed_user
+    
+    get edit_confirmation_path(@confirmed_user.confirmation_token)
+
+    assert_not_equal Time.current, @confirmed_user.reload.confirmed_at
+    assert_redirected_to root_path
+    assert_not_nil flash[:alert]
   end
+
+  test "should prevent authenticated user from re-confirming" do
+    freeze_time
+
+    login @confirmed_user
+    
+    get new_confirmation_path
+    assert_redirected_to root_path
+    assert_not_nil flash[:alert]
+
+    assert_no_emails do
+      post confirmations_path, params: { user: { email: @confirmed_user.email } }
+    end
+
+    assert_redirected_to root_path
+    assert_not_nil flash[:alert]
+  end  
+
 end

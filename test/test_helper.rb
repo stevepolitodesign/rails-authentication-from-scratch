@@ -10,4 +10,20 @@ class ActiveSupport::TestCase
   fixtures :all
 
   # Add more helper methods to be used by all tests here...
+  def current_user
+    session[:current_user_id] && User.find_by(id: session[:current_user_id])
+  end
+
+  def login(user)
+    post login_path, params: {
+      user: {
+        email: user.email,
+        password: user.password
+      }
+    }
+  end
+
+  def logout
+    session.delete(:current_user_id)
+  end
 end

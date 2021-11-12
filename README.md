@@ -254,7 +254,7 @@ rails g controller Confirmations
 class ConfirmationsController < ApplicationController
 
   def create
-    @user = User.find_by(email: params[:user][:email])
+    @user = User.find_by(email: params[:user][:email].downcase)
 
     if @user && @user.unconfirmed?
       redirect_to root_path, notice: "Check your email for confirmation instructions."
@@ -305,7 +305,7 @@ end
 
 > **What's Going On Here?**
 > 
-> - The `create` action will be used to resend confirmation instructions to a user who is unconfirmed. We still need to build this mailer, and we still need to send this mailer when a user initially signs up. This action will be requested via the form on `app/views/confirmations/new.html.erb`.
+> - The `create` action will be used to resend confirmation instructions to a user who is unconfirmed. We still need to build this mailer, and we still need to send this mailer when a user initially signs up. This action will be requested via the form on `app/views/confirmations/new.html.erb`. Note that we call `downcase` on the email to account for case sensitivity when searching.
 > - The `edit` action is used to confirm a user's email. This will be the page that a user lands on when they click the confirmation link in their email. We still need to build this. Note that we're looking up a user through their `confirmation_token` and not their email or ID. This is because The `confirmation_token` is randomly generated and can't be easily guessed unlike an email or numeric ID. This is also why we added `param: :confirmation_token` as a [named route parameter](https://guides.rubyonrails.org/routing.html#overriding-named-route-parameters). Note that we check if their confirmation token has expired before confirming their account.
 
 ## Step 5: Create Confirmation Mailer
@@ -398,7 +398,7 @@ Now we can send a confirmation email when a user signs up or if they need to hav
 class ConfirmationsController < ApplicationController
 
   def create
-    @user = User.find_by(email: params[:user][:email])
+    @user = User.find_by(email: params[:user][:email].downcase)
 
     if @user && @user.unconfirmed?
       @user.send_confirmation_email!
@@ -421,5 +421,190 @@ class UsersController < ApplicationController
     end
   end
 
+end
+```
+
+## Step 6: Create Current Model and Authentication Concern
+
+1. Create a model to store the current user.
+
+```ruby
+# app/models/current.rb
+class Current < ActiveSupport::CurrentAttributes
+  attribute :user
+end
+```
+
+2. Create a Concern to store helper methods that will be shared accross the application.
+
+```ruby
+# app/controllers/concerns/authentication.rb
+module Authentication
+  extend ActiveSupport::Concern
+
+  included do
+    before_action :current_user
+    helper_method :current_user
+    helper_method :user_signed_in?
+  end
+
+  def login(user)
+    reset_session
+    session[:current_user_id] = user.id
+  end
+
+  def logout
+    reset_session
+  end
+
+  def redirect_if_authenticated
+    redirect_to root_path, alert: "You are already logged in." if user_signed_in?
+  end
+
+  private
+
+  def current_user
+    Current.user = session[:current_user_id] && User.find_by(id: session[:current_user_id])
+  end
+
+  def user_signed_in?
+    Current.user.present?
+  end
+
+end
+```
+
+3. Load the Authentication Concern into the Application Controller.
+
+```ruby
+# app/controllers/application_controller.rb
+class ApplicationController < ActionController::Base
+  include Authentication
+end
+```
+
+> **What's Going On Here?**
+> 
+> - The `Current` class inherits from [ActiveSupport::CurrentAttributes](https://api.rubyonrails.org/classes/ActiveSupport/CurrentAttributes.html) which allows us to keep all per-request attributes easily available to the whole system. In essence this will allow us to set a current user and have access to that user during each request to the server. 
+> - The `Authentication` Concern provides an interface for logging the user in and out. We load it into the `ApplicationController` so that it will be used acrosss the whole application.
+>   - The `login` method first [resets the session](https://api.rubyonrails.org/classes/ActionController/Metal.html#method-i-reset_session) to account for [session fixation](https://guides.rubyonrails.org/security.html#session-fixation-countermeasures).
+>   - We set the user's ID in the [session](https://guides.rubyonrails.org/action_controller_overview.html#session) so that we can have access to the user across requests. The user's ID won't be stored in plain text. The cookie data is cryptographically signed to make it tamper-proof. And it is also encrypted so anyone with access to it can't read its contents.
+>   - The `logout` method simply [resets the session](https://api.rubyonrails.org/classes/ActionController/Metal.html#method-i-reset_session).
+>   - The `redirect_if_authenticated` method checks to see if the user is logged in. If they are, they'll be redirected to the `root_path`. This will be useful on pages an authenticated user should not be able to access, such as the login page.
+>   - The `current_user` method returns a `User` and sets it as the user on the `Current` class we created. We call the `before_action` [filter](https://guides.rubyonrails.org/action_controller_overview.html#filters) so that we have access to the current user before each request. We also add this as a [helper_method](https://api.rubyonrails.org/classes/AbstractController/Helpers/ClassMethods.html#method-i-helper_method) so that we have access to `current_user` in the views.
+>   - The `user_signed_in?` method simply returns true or false depending on whether the user is signed in or not. This is helpful for conditionally rendering items in views. 
+
+## Step 7: Create Login Page
+
+1. Generate Sessions Controller.
+
+```bash
+rails g controller Sessions
+```
+
+```ruby
+# app/controllers/sessions_controller.rb
+class SessionsController < ApplicationController
+  before_action :redirect_if_authenticated, only: [:create, :new]
+
+  def create
+    @user = User.find_by(email: params[:user][:email].downcase)
+    if @user
+      if @user.unconfirmed?
+        redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
+      elsif @user.authenticate(params[:user][:password])
+        login @user
+        redirect_to root_path, notice: "Signed in."
+      else
+        flash[:alert] = "Incorrect email or password."
+        render :new        
+      end
+    else
+      flash[:alert] = "Incorrect email or password."
+      render :new
+    end
+  end
+
+  def destroy
+    logout
+    redirect_to root_path, notice: "Singed out."
+  end
+
+  def new
+  end
+
+end
+```
+
+2. Update routes.
+
+```ruby
+# config/routes.rb
+Rails.application.routes.draw do
+  ...
+  post "login", to: "sessions#create"
+  delete "logout", to: "sessions#destroy"
+  get "login", to: "sessions#new"
+end
+```
+
+3. Add sign in form.
+
+```html+ruby
+<!-- app/views/sessions/new.html.erb -->
+<%= form_with url: login_path, scope: :user do |form| %>
+  <div>
+    <%= form.label :email %>
+    <%= form.text_field :email, required: true %>
+  </div>
+  <div>
+    <%= form.label :password %>
+    <%= form.password_field :password, required: true %>
+  </div>
+  <div>
+    <%= form.label :password_confirmation %>
+    <%= form.password_field :password_confirmation, required: true %>
+  </div>
+  <%= form.submit %>
+<% end %>
+```
+
+> **What's Going On Here?**
+> 
+> - The `create` method simply simply checks if the user exists and is confirmed. If they are, then we check their password. If the password is correct, we log them in via the `login` method we created in the `Authentication` Concern. Otherwise, we render a an alert.  
+>   - We're able to call `user.authenticate` because of [has_secure_password](https://api.rubyonrails.org/classes/ActiveModel/SecurePassword/ClassMethods.html#method-i-has_secure_password)
+>   - Note that we call `downcase` on the email to account for case sensitivity when searching.
+> - The `destroy` method simply calls the `logout` method we created in the `Authentication` Concern.
+> - The login form is passed a `scope: :user` option so that the params are namespaced as `params[:user][:some_value]`. This is not required, but it helps keep thins organized. 
+
+## Step 8: Update Existing Controllers
+
+1. Updated Controllers to prevent authenticated users from accessing pages intended for anonymous users.
+
+```ruby
+# app/controllers/confirmations_controller.rb
+class ConfirmationsController < ApplicationController
+  before_action :redirect_if_authenticated
+
+  def edit
+    ...
+    if @user && @user.confirmation_token_has_not_expired?
+      @user.confirm!
+      login @user
+      ...  
+    else
+    end
+    ...
+  end
+end
+```
+
+Note that we also call `login @user` once a user is confirmed. That way they'll be automatically logged in after confirming their email.
+
+```ruby
+# app/controllers/users_controller.rb
+class UsersController < ApplicationController
+  before_action :redirect_if_authenticated, only: [:create, :new]
+  ...
 end
 ```
