@@ -1,6 +1,4 @@
-<%# TODO: Use a scope instead %>
-<%= form_with model: @user, url: sign_up_path do |form| %>
-  <%= render partial: "shared/form_errors", locals: { object: form.object } %>
+<%= form_with url: login_path, scope: :user do |form| %>
   <div>
     <%= form.label :email %>
     <%= form.text_field :email, required: true %>

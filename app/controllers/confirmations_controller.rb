@@ -1,8 +1,8 @@
 class ConfirmationsController < ApplicationController
+  before_action :redirect_if_authenticated
 
   def create
-    # TODO: Prevent authenticated users from access this action
-    @user = User.find_by(email: params[:user][:email])
+    @user = User.find_by(email: params[:user][:email].downcase)
 
     if @user && @user.unconfirmed?
       @user.send_confirmation_email!
@@ -13,12 +13,11 @@ class ConfirmationsController < ApplicationController
   end
 
   def edit
-    # TODO: Prevent authenticated users from access this action
     @user = User.find_by(confirmation_token: params[:confirmation_token])
 
     if @user && @user.confirmation_token_has_not_expired?
       @user.confirm!
-      # TODO: authenticate @user and create session
+      login @user
       redirect_to root_path, notice: "Your account has been confirmed."
     else
       redirect_to new_confirmation_path, alert: "Invalid token."
@@ -26,7 +25,6 @@ class ConfirmationsController < ApplicationController
   end
 
   def new
-    # TODO: Prevent authenticated users from access this action
     @user = User.new
   end
 

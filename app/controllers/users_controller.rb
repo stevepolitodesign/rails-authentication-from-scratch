@@ -1,7 +1,7 @@
 class UsersController < ApplicationController
+  before_action :redirect_if_authenticated, only: [:create, :new]
 
   def create
-    # TODO: Prevent authenticated @user from accessing this action
     @user = User.new(user_params)
     if @user.save
       @user.send_confirmation_email!
@@ -12,7 +12,6 @@ class UsersController < ApplicationController
   end
 
   def new
-    # TODO: Prevent authenticated @user from accessing this action
     @user = User.new
   end
 

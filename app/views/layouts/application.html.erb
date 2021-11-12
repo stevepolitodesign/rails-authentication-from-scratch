@@ -11,9 +11,18 @@
   </head>
 
   <body>
-    <% flash.each do |message_type, message| %>
-      <div class="<%= message_type %>"><%= message %></div>
-    <% end %>
-    <%= yield %>
+    <header style="width: 1200px; margin: 0 auto;">
+      <% flash.each do |message_type, message| %>
+        <div class="<%= message_type %>"><%= message %></div>
+      <% end %>
+      <% if user_signed_in? %>
+        <%= link_to "Logout", logout_path, method: :delete %>
+      <% else %>
+        <%= link_to "Login", login_path %>
+      <% end %>
+    <header>
+    <main style="width: 1200px; margin: 0 auto;"> 
+      <%= yield %>
+    <main>
   </body>
 </html>
