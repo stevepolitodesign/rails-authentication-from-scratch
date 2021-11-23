@@ -82,4 +82,30 @@ class UserTest < ActiveSupport::TestCase
     @user.confirmation_sent_at = 601.seconds.ago
     assert_not @user.confirmation_token_has_not_expired?
   end
- end
+
+  test "should respond to send_password_reset_email!" do
+    @user.save!
+    original_password_reset_token = @user.password_reset_token
+    
+    freeze_time
+
+    assert_nil @user.password_reset_sent_at
+
+    assert_emails 1 do
+      @user.send_password_reset_email!
+    end
+
+    assert_not_equal original_password_reset_token, @user.reload.password_reset_token
+    assert_equal Time.now, @user.password_reset_sent_at
+  end
+
+  test "should respond to password_reset_token_has_expired?" do
+    assert @user.password_reset_token_has_expired?
+
+    @user.password_reset_sent_at = 1.minute.ago
+    assert_not @user.password_reset_token_has_expired?
+
+    @user.password_reset_sent_at = 601.seconds.ago
+    assert @user.password_reset_token_has_expired?
+  end
+end

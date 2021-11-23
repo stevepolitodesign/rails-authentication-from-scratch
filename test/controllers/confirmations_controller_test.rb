@@ -44,8 +44,6 @@ class ConfirmationsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should prevent user from confirming if they are already confirmed" do
-    @confirmed_user = User.create!(email: "confirmed_user@example.com", confirmation_sent_at: Time.current, confirmed_at: Time.now, password: "password", password_confirmation: "password")
-
     assert_no_emails do
       post confirmations_path, params: { user: { email: @confirmed_user.email } }
     end

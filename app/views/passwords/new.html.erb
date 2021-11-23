@@ -1,0 +1,4 @@
+<%= form_with url: passwords_path, scope: :user do |form| %>
+  <%= form.email_field :email, required: true %>
+  <%= form.submit "Reset Password" %>
+<% end %>
