@@ -7,6 +7,10 @@ module Authentication
     helper_method :user_signed_in?
   end
 
+  def authenticate_user!
+    redirect_to login_path, alert: "You need to login to access that page." unless user_signed_in?
+  end
+
   def login(user)
     reset_session
     session[:current_user_id] = user.id

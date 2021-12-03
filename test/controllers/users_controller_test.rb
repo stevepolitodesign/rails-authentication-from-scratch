@@ -58,16 +58,94 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "should edit user" do
-    flunk
+  test "should get edit if authorized" do
+    login(@confirmed_user)
+
+    get account_path
+    assert_response :ok
   end
 
-  test "should not be able to edit other users" do
-    flunk
+  test "should redirect unauthorized user from editing account" do
+    get account_path
+    assert_redirected_to login_path
+    assert_not_nil flash[:alert]
   end
+
+  test "should edit email" do
+    unconfirmed_email = "unconfirmed_user@example.com"
+    current_email = @confirmed_user.email
+
+    login(@confirmed_user)
+
+    assert_emails 1 do
+      put account_path, params: {
+        user: {
+          unconfirmed_email: unconfirmed_email,
+          current_password: "password"
+        }
+      }
+    end
+
+    assert_not_nil flash[:notice]
+    assert_equal current_email, @confirmed_user.reload.email
+  end
+
+  test "should not edit email if current_password is incorrect" do
+    unconfirmed_email = "unconfirmed_user@example.com"
+    current_email = @confirmed_user.email
+
+    login(@confirmed_user)
+
+    assert_no_emails do
+      put account_path, params: {
+        user: {
+          unconfirmed_email: unconfirmed_email,
+          current_password: "wrong_password"
+        }
+      }
+    end
+
+    assert_not_nil flash[:notice]
+    assert_equal current_email, @confirmed_user.reload.email
+  end  
+
+  test "should update password" do
+    login(@confirmed_user)
+
+    put account_path, params: {
+      user: {
+        current_password: "password",
+        password: "new_password",
+        password_confirmation: "new_password",
+      }
+    }
+
+    assert_redirected_to root_path
+    assert_not_nil flash[:notice]
+  end
+
+  test "should not update password if current_password is incorrect" do
+    login(@confirmed_user)
+
+    put account_path, params: {
+      user: {
+        current_password: "wrong_password",
+        password: "new_password",
+        password_confirmation: "new_password",
+      }
+    }
+
+    assert_response :unprocessable_entity
+  end  
 
   test "should delete user" do
-    flunk
+    login(@confirmed_user)
+
+    delete account_path(@confirmed_user)
+
+    assert_nil current_user
+    assert_redirected_to root_path
+    assert_not_nil flash[:notice]
   end
 
 end
