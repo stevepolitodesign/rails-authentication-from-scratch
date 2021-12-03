@@ -206,6 +206,7 @@ end
 ```
 
 ```html+ruby
+<!-- app/views/users/new.html.erb -->
 <%= form_with model: @user, url: sign_up_path do |form| %>
   <%= render partial: "shared/form_errors", locals: { object: form.object } %>
   <div>
@@ -222,11 +223,6 @@ end
   </div>
   <%= form.submit %>
 <% end %>
-```
-
-```
-<!-- app/views/users/new.html.erb -->
-<%= render "form" %>
 ```
 
 4. Update routes.
@@ -584,7 +580,7 @@ end
 ```ruby
 # app/controllers/confirmations_controller.rb
 class ConfirmationsController < ApplicationController
-  before_action :redirect_if_authenticated
+  before_action :redirect_if_authenticated, only: [:create, :new]
 
   def edit
     ...
@@ -665,6 +661,21 @@ class User < ApplicationRecord
 end
 ```
 
+5. Update User Mailer.
+
+```ruby
+# app/mailers/user_mailer.rb
+class UserMailer < ApplicationMailer
+  ...
+  def password_reset(user)
+    @user = user
+
+    mail to: @user.email, subject: "Password Reset Instructions"
+  end
+end
+
+```
+
 > **What's Going On Here?**
 >
 > - The `has_secure_token :password_reset_token` method is added to give us an [API](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) to work with the `password_reset_token` column.
@@ -738,6 +749,7 @@ end
 ```
 
 > **What's Going On Here?**
+> 
 > - The `create` action will send an email to the user containing a link that will allow them to reset the password. The link will contain their `password_reset_token` which is unique and expires. Note that we call `downcase` on the email to account for case sensitivity when searching.
 >   - Note that we return `If that user exists we've sent instructions to their email.` even if the user is not found. This makes it difficult for a bad actor to use the reset form to see which email accounts exist on the application.
 > - The `edit` action renders simply renders the form for the user to update their password. It attempts to find a user by there `password_reset_token`. You can think of the `password_reset_token` as a way to identify the user  much like how we normally identify records by their ID. However, the `password_reset_token` is randomly generated and will expire so it's more secure.
@@ -787,3 +799,243 @@ end
 > **What's Going On Here?**
 >
 > - The password reset form is passed a `scope: :user` option so that the params are namespaced as `params[:user][:some_value]`. This is not required, but it helps keep things organized.
+
+## Step 11: Add Unconfirmed Email Column To Users Table
+
+1. Create migration and run migration
+
+```bash
+rails g migration add_unconfirmed_email_to_users unconfirmed_email:string
+rails db:migrate
+```
+
+2. Update User Model.
+
+```ruby
+# app/models/user.rb
+class User < ApplicationRecord
+  ...
+  attr_accessor :current_password
+  ...
+  before_save :downcase_unconfirmed_email
+  ...
+  validates :unconfirmed_email, format: { with: VALID_EMAIL_REGEX, allow_blank: true }
+  validate :unconfirmed_email_must_be_available
+
+  def confirm!
+    if self.unconfirmed_email.present?
+      self.update(email: self.unconfirmed_email, unconfirmed_email: nil)
+    end
+    self.update_columns(confirmed_at: Time.current)
+  end
+  ...
+  def confirmable_email
+    if self.unconfirmed_email.present?
+      self.unconfirmed_email
+    else
+      self.email
+    end
+  end
+  ...
+  def reconfirming?
+    self.unconfirmed_email.present?
+  end
+
+  def unconfirmed_or_reconfirming?
+    self.unconfirmed? || self.reconfirming?
+  end
+
+  private
+  ...
+  def downcase_unconfirmed_email
+    return if self.unconfirmed_email.nil?
+    self.unconfirmed_email = self.unconfirmed_email.downcase
+  end
+
+  def unconfirmed_email_must_be_available
+    return if self.unconfirmed_email.nil?
+    if User.find_by(email: self.unconfirmed_email.downcase)
+      errors.add(:unconfirmed_email, "is already in use.")
+    end
+  end
+
+end
+```
+
+3. Update User Mailer.
+
+```ruby
+# app/mailers/user_mailer.rb
+class UserMailer < ApplicationMailer
+
+  def confirmation(user)
+    ...
+    mail to: @user.confirmable_email, subject: "Confirmation Instructions"
+  end
+end
+
+```
+
+> **What's Going On Here?**
+>
+> - We add a `unconfirmed_email` to the `users_table` so that we have a place to store the email a user is trying to use after their account has been confirmed with their original email.
+> - We add `attr_accessor :current_password` so that we'll be able to use `f.password_field :current_password` in the user form (which doesn't exist yet). This will allow us to require the user to submit their current password before they can update their account.
+> - We ensure to format the `unconfirmed_email` before saving to the database. This ensures all data is saved consistently.
+> - We add validations to the `unconfirmed_email` column ensuring it's a valid email address and that it's not currently in use.
+> - We update the `confirm!` method to set the `email` column to the value of the `unconfirmed_email` column, and then clear out the `unconfirmed_email` column. This will only happen if a user is trying to confirm a new email address.
+> - We add the `confirmable_email` method so that we can call the correct email in the the updated `UserMailer`.
+> - We add `reconfirming?` and `unconfirmed_or_reconfirming?` to help us determine what state a user is in. This will come in handy later in our controllers.
+
+## Step 12: Update Users Controller
+
+1. Update Authentication Concern
+
+```ruby
+# app/controllers/concerns/authentication.rb
+module Authentication
+  ...
+  def authenticate_user!
+    redirect_to login_path, alert: "You need to login to access that page." unless user_signed_in?
+  end
+  ...
+end
+```
+
+> **What's Going On Here?**
+>
+> - The `authenticate_user!` method can be called to ensure an anonymous user cannot access a page that requires a user to be logged in. We'll need this when we build the page allowing a user to edit or delete their profile.
+
+2. Add destroy, edit and update methods. Modify create method and user_params.
+
+```ruby
+# app/controllers/users_controller.rb
+class UsersController < ApplicationController
+  before_action :authenticate_user!, only: [:edit, :destroy, :update]
+  ...
+  def create
+    @user = User.new(create_user_params)
+    ...
+  end
+
+  def destroy
+    current_user.destroy
+    reset_session
+    redirect_to root_path, notice: "Your account has been deleted."
+  end
+
+  def edit
+    @user = current_user
+  end
+  ...
+  def update
+    @user = current_user
+    if @user.authenticate(params[:user][:current_password])
+      if @user.update(update_user_params)
+        if params[:user][:unconfirmed_email].present?
+          @user.send_confirmation_email!
+          redirect_to root_path, notice: "Check your email for confirmation instructions."
+        else
+          redirect_to root_path, notice: "Account updated."
+        end
+      else
+        render :edit, status: :unprocessable_entity
+      end
+    else
+      flash.now[:error] = "Incorrect password"
+      render :edit, status: :unprocessable_entity
+    end
+  end
+
+  private
+
+  def create_user_params
+    params.require(:user).permit(:email, :password, :password_confirmation)
+  end
+
+  def update_user_params
+    params.require(:user).permit(:current_password, :password, :password_confirmation, :unconfirmed_email)
+  end
+end
+```
+
+> **What's Going On Here?**
+>
+> - We call `redirect_if_authenticated` before editing, destroying or updating a user, since only an authenticated use should be able to do this.
+> - We update the `create` method to accept `create_user_params` (formerly `user_params`). This is because we're going to require different parameters for creating an account vs. editing an account.
+> - The `destroy` action simply deletes the user and logs them out. Note that we're calling `current_user`, so this action can only be scoped to the user who is logged in.
+> - The `edit` action simply assigns `@user` to the `current_user` so that we have access to the user in the edit form.
+> - The `update` action first checks if their password is correct. Note that we're passing this in as `current_password` and not `password`. This is because we still want a user to be able to change their password and therefor we need another parameter to store this value. This is also why we have a private `update_user_params` method.
+>   - If the user is updating their email address (via `unconfirmed_email`) we send a confirmation email to that new email address before setting it as the `email` value.
+>   - We force a user to always put in their `current_password` as an extra security measure incase someone leaves their browser open on a public computer.
+
+3. Update routes.
+
+```ruby
+# config/routes.rb
+Rails.application.routes.draw do
+  ...
+  put "account", to: "users#update"
+  get "account", to: "users#edit"
+  delete "account", to: "users#destroy"
+  ...
+end
+```
+
+4. Create edit form.
+
+```html+ruby
+<!-- app/views/users/edit.html.erb -->
+<%= form_with model: @user, url: account_path, method: :put do |form| %>
+  <%= render partial: "shared/form_errors", locals: { object: form.object } %>
+  <div>
+    <%= form.label :email, "Current Email" %>
+    <%= form.text_field :email, disabled: true %>
+  </div>
+  <div>
+    <%= form.label :unconfirmed_email, "New Email" %>
+    <%= form.text_field :unconfirmed_email %>
+  </div>
+  <div>
+    <%= form.label :password, "Password (leave blank if you don't want to change it)" %>
+    <%= form.password_field :password %>
+  </div>
+  <div>
+    <%= form.label :password_confirmation %>
+    <%= form.password_field :password_confirmation %>
+  </div>
+  <hr/>
+  <div>
+    <%= form.label :current_password, "Current password (we need your current password to confirm your changes)" %>
+    <%= form.password_field :current_password, required: true %>
+  </div>
+  <%= form.submit %>
+<% end %>
+```
+
+> **What's Going On Here?**
+>
+> - We `disable` the `email` field to ensure we're not passing that value back to the controller. This is just so the user can see what their current email is.
+> - We `require` the `current_password` field since we'll always want to a user to confirm their password before making changes.
+> - The `password` and `password_confirmation` fields are there if a user wants to update their current password.
+
+## Step 13: Update Confirmations Controller
+
+1. Update edit action.
+
+```ruby
+# app/controllers/confirmations_controller.rb
+class ConfirmationsController < ApplicationController
+  ...
+  def edit
+    ...
+    if @user && @user.unconfirmed_or_reconfirming? && @user.confirmation_token_has_not_expired?
+      ...
+    end
+  end
+  ...
+end
+```
+
+> **What's Going On Here?**
+>
+> - We add `@user.unconfirmed_or_reconfirming?` to the conditional to ensure only unconfirmed users or users who are reconfirming can access this page. This is necessary since we're now allowing users to confirm new email addresses.

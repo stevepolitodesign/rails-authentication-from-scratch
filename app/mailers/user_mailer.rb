@@ -9,7 +9,7 @@ class UserMailer < ApplicationMailer
   def confirmation(user)
     @user = user
 
-    mail to: @user.email, subject: "Confirmation Instructions"
+    mail to: @user.confirmable_email, subject: "Confirmation Instructions"
   end
 
   def password_reset(user)
