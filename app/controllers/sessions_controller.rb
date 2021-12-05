@@ -3,19 +3,16 @@ class SessionsController < ApplicationController
 
   def create
     @user = User.find_by(email: params[:user][:email].downcase)
-    if @user
-      if @user.unconfirmed?
-        redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
-      elsif @user.authenticate(params[:user][:password])
-        login @user
-        redirect_to root_path, notice: "Signed in."
-      else
-        flash[:alert] = "Incorrect email or password."
-        render :new        
-      end
+    
+    render_new_with_alert unless @user
+    
+    if @user.unconfirmed?
+      redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
+    elsif @user.authenticate(params[:user][:password])
+      login @user
+      redirect_to root_path, notice: "Signed in."
     else
-      flash[:alert] = "Incorrect email or password."
-      render :new
+      render_new_with_alert
     end
   end
 
@@ -26,5 +23,11 @@ class SessionsController < ApplicationController
 
   def new
   end
-
+  
+  private
+  
+  def render_new_with_alert
+    flash[:alert] = "Incorrect email or password."
+    render :new
+  end
 end
