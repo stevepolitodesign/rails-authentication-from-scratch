@@ -3,15 +3,14 @@ class PasswordsController < ApplicationController
 
   def create
     @user = User.find_by(email: params[:user][:email].downcase)
-    if @user.present?
-      if @user.confirmed?
-        @user.send_password_reset_email!
-        redirect_to root_path, notice: "If that user exists we've sent instructions to their email."
-      else
-        redirect_to new_confirmation_path, alert: "Please confirm your email first."
-      end
+    
+    redirect_to_root_with_notice unless @user.present?
+
+    if @user.confirmed?
+      @user.send_password_reset_email!
+      redirect_to_root_with_notice
     else
-      redirect_to root_path, notice: "If that user exists we've sent instructions to their email."
+      redirect_to new_confirmation_path, alert: "Please confirm your email first."
     end
   end
 
@@ -29,24 +28,30 @@ class PasswordsController < ApplicationController
 
   def update
     @user = User.find_by(password_reset_token: params[:password_reset_token])
-    if @user
-      if @user.unconfirmed?
-        redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
-      elsif @user.password_reset_token_has_expired?
-        redirect_to new_password_path, alert: "Incorrect email or password."
-      elsif @user.update(password_params)
-        redirect_to login_path, notice: "Signed in."
-      else
-        flash[:alert] = @user.errors.full_messages.to_sentence
-        render :edit        
-      end
+    
+    render_and_alert(:new, "Incorrect email or password.") unless @user
+    
+    if @user.unconfirmed?
+      redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
+    elsif @user.password_reset_token_has_expired?
+      redirect_to new_password_path, alert: "Incorrect email or password."
+    elsif @user.update(password_params)
+      redirect_to login_path, notice: "Signed in."
     else
-      flash[:alert] = "Incorrect email or password."
-      render :new
+      render_and_alert(:edit, @user.errors.full_messages.to_sentence)
     end
   end
 
   private
+  
+  def render_and_alert(action, alert)
+    flash[:alert] = alert
+    render action
+  end
+  
+  def redirect_to_root_with_notice
+    redirect_to root_path, notice: "If that user exists we've sent instructions to their email."
+  end
 
   def password_params
     params.require(:user).permit(:password, :password_confirmation)
