@@ -557,10 +557,6 @@ end
     <%= form.label :password %>
     <%= form.password_field :password, required: true %>
   </div>
-  <div>
-    <%= form.label :password_confirmation %>
-    <%= form.password_field :password_confirmation, required: true %>
-  </div>
   <%= form.submit %>
 <% end %>
 ```
@@ -1039,3 +1035,144 @@ end
 > **What's Going On Here?**
 >
 > - We add `@user.unconfirmed_or_reconfirming?` to the conditional to ensure only unconfirmed users or users who are reconfirming can access this page. This is necessary since we're now allowing users to confirm new email addresses.
+
+## Step 14: Add Remember Token Column to Users Table
+
+1. Create migration.
+
+```bash
+rails g migration add_remember_token_to_users remember_token:string
+```
+
+2. Update migration.
+
+```ruby
+# db/migrate/[timestamp]_add_remember_token_to_users.rb
+class AddRememberTokenToUsers < ActiveRecord::Migration[6.1]
+  def change
+    add_column :users, :remember_token, :string, null: false
+    add_index :users, :remember_token, unique: true
+  end
+end
+```
+
+> **What's Going On Here?**
+>
+> - We add `null: false` to ensure this column always has a value.
+> - We add a [unique index](https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/Table.html#method-i-index) to ensure this column has unique data.
+
+3. Run migrations.
+
+```bash
+rails db:migrate
+```
+
+4. Update User model.
+
+```ruby
+# app/models/user.rb
+class User < ApplicationRecord
+  ...
+  has_secure_token :remember_token
+  ...
+end
+```
+
+> **What's Going On Here?**
+>
+> - Just like the `confirmation_token` and `password_reset_token` columns, we call [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) on the `remember_token`. This ensures that the value for this column will be set when the record is created. This value will be used later to securely identify the user.
+
+## Step 15: Update Authentication Concern
+
+1. Add new helper methods.
+
+```ruby
+# app/controllers/concerns/authentication.rb
+module Authentication
+  extend ActiveSupport::Concern
+  ...
+  def forget(user)
+    cookies.delete :remember_token
+    user.regenerate_remember_token
+  end
+  ...
+  def remember(user)
+    user.regenerate_remember_token
+    cookies.permanent.encrypted[:remember_token] = user.remember_token
+  end
+  ...
+  private
+
+  def current_user
+    if session[:current_user_id].present?
+      Current.user = User.find_by(id: session[:current_user_id])
+    elsif cookies.permanent.encrypted[:remember_token].present?
+      Current.user = User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
+    else
+      Current.user = nil
+    end
+  end
+  ...
+end
+```
+
+> **What's Going On Here?**
+>
+> - The `remember` method first regenerates a new `remember_token` to ensure these values are being rotated and can't be used more than once. We get the `regenerate_remember_token` method from [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token). Next, we assigned this value to a [cookie](https://api.rubyonrails.org/classes/ActionDispatch/Cookies.html). The call to [permanent](https://api.rubyonrails.org/classes/ActionDispatch/Cookies/ChainedCookieJars.html#method-i-permanent) ensures the cookie won't expire until 20 years from now. The call to [encrypted](https://api.rubyonrails.org/classes/ActionDispatch/Cookies/ChainedCookieJars.html#method-i-encrypted) ensures the value will be encrypted. This is vital since this value is used to identify the user and is being set in the browser.
+> - The `forget` method deletes the cookie and regenerates a new `remember_token` to ensure these values are being rotated and can't be used more than once.
+> - We updated the `current_user` method by adding a conditional to first try and find the user by the session, and then fallback to finding the user be the cookie. This is the logic that allows a user to completely exit their browser and still remain logged in when they return to the website since the cookie will still be set.
+
+## Step 16: Update Sessions Controller
+
+1. Update the `create` and `destroy` methods.
+
+```ruby
+# app/controllers/sessions_controller.rb
+class SessionsController < ApplicationController
+  ...
+  before_action :authenticate_user!, only: [:destroy]
+  
+  def create
+    ...
+    if @user
+      if @user.unconfirmed?
+        ...
+      elsif @user.authenticate(params[:user][:password])
+        login @user
+        remember(@user) if params[:user][:remember_me] == "1"
+        ...
+      else
+        ...  
+      end
+    else
+      ...
+    end
+  end
+
+  def destroy
+    forget(current_user)
+    ...
+  end
+  ...
+end
+```
+
+> **What's Going On Here?**
+>
+> - We conditionally call `remember(@user)` in the `create` method if the user has checked the "Remember me" checkbox. We still need to add this to our form.
+> - We call `forget(current_user)` in the `destroy` method to ensure we delete the `remember_me` cookie and regenerate the user's `remember_token` token.
+> - We also add a `before_action` to ensure only authenticated users can access the `destroy` action.
+
+2. Add "Remember me" checkbox to login form.
+
+```html+ruby
+<!-- app/views/sessions/new.html.erb -->
+<%= form_with url: login_path, scope: :user do |form| %>
+  ...
+  <div>
+    <%= form.label :remember_me %>
+    <%= form.check_box :remember_me %>
+  </div>
+  <%= form.submit %>
+<% end %>
+```

@@ -16,6 +16,11 @@ module Authentication
     session[:current_user_id] = user.id
   end
 
+  def forget(user)
+    cookies.delete :remember_token
+    user.regenerate_remember_token
+  end
+
   def logout
     reset_session
   end
@@ -24,10 +29,21 @@ module Authentication
     redirect_to root_path, alert: "You are already logged in." if user_signed_in?
   end
 
+  def remember(user)
+    user.regenerate_remember_token
+    cookies.permanent.encrypted[:remember_token] = user.remember_token
+  end
+
   private
 
   def current_user
-    Current.user = session[:current_user_id] && User.find_by(id: session[:current_user_id])
+    if session[:current_user_id].present?
+      Current.user = User.find_by(id: session[:current_user_id])
+    elsif cookies.permanent.encrypted[:remember_token].present?
+      Current.user = User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
+    else
+      Current.user = nil
+    end
   end
 
   def user_signed_in?

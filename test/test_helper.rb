@@ -14,13 +14,15 @@ class ActiveSupport::TestCase
     session[:current_user_id] && User.find_by(id: session[:current_user_id])
   end
 
-  def login(user)
+  def login(user, remember_user: nil)
     post login_path, params: {
       user: {
         email: user.email,
-        password: user.password
+        password: user.password,
+        remember_me: remember_user == true ? 1 : 0
       }
     }
+
   end
 
   def logout
