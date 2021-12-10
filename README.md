@@ -1176,3 +1176,60 @@ end
   <%= form.submit %>
 <% end %>
 ```
+
+## Step 15: Add Friendly Redirects
+
+1. Update Authentication Concern.
+
+```ruby
+# app/controllers/concerns/authentication.rb
+module Authentication
+  ...
+  def authenticate_user!
+    store_location
+    ...
+  end
+  ...
+  def store_location
+    session[:user_return_to] = request.original_url if request.get?
+  end
+  ...
+end
+```
+
+> **What's Going On Here?**
+>
+> - The `store_location` method stores the [request.original_url](https://api.rubyonrails.org/classes/ActionDispatch/Request.html#method-i-original_url) in the [session](https://guides.rubyonrails.org/action_controller_overview.html#session) so it can be retrieved later. We only do this if the request made was a get request. 
+> - We call `store_location` in the `authenticate_user!` method so that we can save the path to the page the user was trying to visit before they were redirected to the login page. We need to do this before visiting the login page otherwise the call to `request.original_url` will always return the url to the login page.
+
+2. Update Sessions Controller.
+
+```ruby
+# app/controllers/sessions_controller.rb
+class SessionsController < ApplicationController
+  ...
+  def create
+    ...
+    if @user
+      if @user.unconfirmed?
+        ...
+      elsif @user.authenticate(params[:user][:password])
+        after_login_path = session[:user_return_to] || root_path
+        login @user
+        remember(@user) if params[:user][:remember_me] == "1"
+        redirect_to after_login_path, notice: "Signed in."
+      else
+        ...
+      end
+    else
+      ...
+    end
+  end
+  ...
+end
+```
+
+> **What's Going On Here?**
+>
+> - The `after_login_path` variable it set to be whatever is in the `session[:user_return_to]`. If there's nothing in `session[:user_return_to]` then it defaults to the `root_path`.
+> - Note that we call this method before calling `login`. This is because `login` calls `reset_session` which would deleted the `session[:user_return_to]`.
