@@ -38,12 +38,12 @@ class User < ApplicationRecord
 
   before_save :downcase_email
 
-  validates :email, format: { with: VALID_EMAIL_REGEX }, presence: true, uniqueness: true
+  validates :email, format: {with: VALID_EMAIL_REGEX}, presence: true, uniqueness: true
 
   private
 
   def downcase_email
-    self.email = self.email.downcase
+    email = email.downcase
   end
 end
 ```
@@ -118,29 +118,29 @@ class User < ApplicationRecord
 
   before_save :downcase_email
 
-  validates :email, format: { with: VALID_EMAIL_REGEX }, presence: true, uniqueness: true
+  validates :email, format: {with: VALID_EMAIL_REGEX}, presence: true, uniqueness: true
 
   def confirm!
-    self.update_columns(confirmed_at: Time.current)
+    update_columns(confirmed_at: Time.current)
   end
 
   def confirmed?
-    self.confirmed_at.present?
+    confirmed_at.present?
   end
 
   def confirmation_token_has_not_expired?
-    return false if self.confirmation_sent_at.nil?
-    (Time.current - self.confirmation_sent_at) <= User::CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS
+    return false if confirmation_sent_at.nil?
+    (Time.current - confirmation_sent_at) <= User::CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS
   end
 
   def unconfirmed?
-    self.confirmed_at.nil?
+    confirmed_at.nil?
   end
 
   private
 
   def downcase_email
-    self.email = self.email.downcase
+    email = email.downcase
   end
 end
 ```
@@ -252,7 +252,7 @@ class ConfirmationsController < ApplicationController
   def create
     @user = User.find_by(email: params[:user][:email].downcase)
 
-    if @user && @user.unconfirmed?
+    if @user.present? && @user.unconfirmed?
       redirect_to root_path, notice: "Check your email for confirmation instructions."
     else
       redirect_to new_confirmation_path, alert: "We could not find a user with that email or that email has already been confirmed."
@@ -262,7 +262,7 @@ class ConfirmationsController < ApplicationController
   def edit
     @user = User.find_by(confirmation_token: params[:confirmation_token])
 
-    if @user && @user.confirmation_token_has_not_expired?
+    if @user.present? && @user.confirmation_token_has_not_expired?
       @user.confirm!
       redirect_to root_path, notice: "Your account has been confirmed."
     else
@@ -350,8 +350,8 @@ class User < ApplicationRecord
   MAILER_FROM_EMAIL = "no-reply@example.com"
   ...
   def send_confirmation_email!
-    self.regenerate_confirmation_token
-    self.update_columns(confirmation_sent_at: Time.current)
+    regenerate_confirmation_token
+    update_columns(confirmation_sent_at: Time.current)
     UserMailer.confirmation(self).deliver_now
   end
 
@@ -396,7 +396,7 @@ class ConfirmationsController < ApplicationController
   def create
     @user = User.find_by(email: params[:user][:email].downcase)
 
-    if @user && @user.unconfirmed?
+    if @user.present? && @user.unconfirmed?
       @user.send_confirmation_email!
       ...
     end
@@ -580,7 +580,7 @@ class ConfirmationsController < ApplicationController
 
   def edit
     ...
-    if @user && @user.confirmation_token_has_not_expired?
+    if @user.present? && @user.confirmation_token_has_not_expired?
       @user.confirm!
       login @user
       ...  
@@ -644,13 +644,13 @@ class User < ApplicationRecord
   has_secure_token :password_reset_token
   ...
   def password_reset_token_has_expired?
-    return true if self.password_reset_sent_at.nil?
-    (Time.current - self.password_reset_sent_at) >= User::PASSWORD_RESET_TOKEN_EXPIRATION_IN_SECONDS
+    return true if password_reset_sent_at.nil?
+    (Time.current - password_reset_sent_at) >= User::PASSWORD_RESET_TOKEN_EXPIRATION_IN_SECONDS
   end
 
   def send_password_reset_email!
-    self.regenerate_password_reset_token
-    self.update_columns(password_reset_sent_at: Time.current)
+    regenerate_password_reset_token
+    update_columns(password_reset_sent_at: Time.current)
     UserMailer.password_reset(self).deliver_now
   end
   ...
@@ -707,7 +707,7 @@ class PasswordsController < ApplicationController
 
   def edit
     @user = User.find_by(password_reset_token: params[:password_reset_token])
-    if @user && @user.unconfirmed?
+    if @user.present? && @user.unconfirmed?
       redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
     elsif @user.nil? || @user.password_reset_token_has_expired?
       redirect_to new_password_path, alert: "Invalid or expired token."
@@ -815,42 +815,42 @@ class User < ApplicationRecord
   ...
   before_save :downcase_unconfirmed_email
   ...
-  validates :unconfirmed_email, format: { with: VALID_EMAIL_REGEX, allow_blank: true }
+  validates :unconfirmed_email, format: {with: VALID_EMAIL_REGEX, allow_blank: true}
   validate :unconfirmed_email_must_be_available
 
   def confirm!
-    if self.unconfirmed_email.present?
-      self.update(email: self.unconfirmed_email, unconfirmed_email: nil)
+    if unconfirmed_email.present?
+      update(email: unconfirmed_email, unconfirmed_email: nil)
     end
-    self.update_columns(confirmed_at: Time.current)
+    update_columns(confirmed_at: Time.current)
   end
   ...
   def confirmable_email
-    if self.unconfirmed_email.present?
-      self.unconfirmed_email
+    if unconfirmed_email.present?
+      unconfirmed_email
     else
-      self.email
+      email
     end
   end
   ...
   def reconfirming?
-    self.unconfirmed_email.present?
+    unconfirmed_email.present?
   end
 
   def unconfirmed_or_reconfirming?
-    self.unconfirmed? || self.reconfirming?
+    unconfirmed? || reconfirming?
   end
 
   private
   ...
   def downcase_unconfirmed_email
-    return if self.unconfirmed_email.nil?
-    self.unconfirmed_email = self.unconfirmed_email.downcase
+    return if unconfirmed_email.nil?
+    unconfirmed_email = unconfirmed_email.downcase
   end
 
   def unconfirmed_email_must_be_available
-    return if self.unconfirmed_email.nil?
-    if User.find_by(email: self.unconfirmed_email.downcase)
+    return if unconfirmed_email.nil?
+    if User.find_by(email: unconfirmed_email.downcase)
       errors.add(:unconfirmed_email, "is already in use.")
     end
   end
@@ -1024,7 +1024,7 @@ class ConfirmationsController < ApplicationController
   ...
   def edit
     ...
-    if @user && @user.unconfirmed_or_reconfirming? && @user.confirmation_token_has_not_expired?
+    if @user.present? && @user.unconfirmed_or_reconfirming? && @user.confirmation_token_has_not_expired?
       ...
     end
   end
@@ -1104,12 +1104,10 @@ module Authentication
   private
 
   def current_user
-    if session[:current_user_id].present?
-      Current.user = User.find_by(id: session[:current_user_id])
+    Current.user = if session[:current_user_id].present?
+      User.find_by(id: session[:current_user_id])
     elsif cookies.permanent.encrypted[:remember_token].present?
-      Current.user = User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
-    else
-      Current.user = nil
+      User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
     end
   end
   ...

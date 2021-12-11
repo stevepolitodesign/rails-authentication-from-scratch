@@ -1,4 +1,4 @@
-ENV['RAILS_ENV'] ||= 'test'
+ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
 
@@ -22,7 +22,6 @@ class ActiveSupport::TestCase
         remember_me: remember_user == true ? 1 : 0
       }
     }
-
   end
 
   def logout

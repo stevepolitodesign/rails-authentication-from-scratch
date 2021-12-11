@@ -1,6 +1,5 @@
 # Preview all emails at http://localhost:3000/rails/mailers/user_mailer
 class UserMailerPreview < ActionMailer::Preview
-
   # Preview this email at http://localhost:3000/rails/mailers/user_mailer/confirmation
   def confirmation
     @unconfirmed_user = User.find_by(email: "unconfirmed_user@example.com") || User.create!(email: "unconfirmed_user@example.com", password: "password", password_confirmation: "password")
@@ -11,6 +10,5 @@ class UserMailerPreview < ActionMailer::Preview
   def password_reset
     @password_reset_user = User.find_by(email: "password_reset_user@example.com") || User.create!(email: "password_reset_user@example.com", password: "password", password_confirmation: "password")
     UserMailer.password_reset(@password_reset_user)
-  end  
-
+  end
 end

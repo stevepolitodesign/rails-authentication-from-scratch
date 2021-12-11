@@ -14,7 +14,7 @@ class SessionsController < ApplicationController
         redirect_to after_login_path, notice: "Signed in."
       else
         flash[:alert] = "Incorrect email or password."
-        render :new        
+        render :new
       end
     else
       flash[:alert] = "Incorrect email or password."
@@ -30,5 +30,4 @@ class SessionsController < ApplicationController
 
   def new
   end
-
 end

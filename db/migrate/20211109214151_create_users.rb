@@ -6,7 +6,7 @@ class CreateUsers < ActiveRecord::Migration[6.1]
 
       t.timestamps
     end
-    
+
     # Enforce unique values
     # https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/SchemaStatements.html#method-i-add_index
     add_index :users, :email, unique: true
