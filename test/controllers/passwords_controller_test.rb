@@ -21,7 +21,7 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to new_password_path
     assert_not_nil flash[:alert]
   end
-  
+
   test "should redirect from edit if password link is incorrect" do
     travel_to 601.seconds.from_now
     get edit_password_path("not_a_real_token")
@@ -103,11 +103,11 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
     put password_path(@confirmed_user.password_reset_token), params: {
       user: {
         password: "password",
-        password_confirmation: "password",
-        
+        password_confirmation: "password"
+
       }
     }
-    
+
     get new_password_path
     assert_redirected_to root_path
   end

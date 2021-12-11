@@ -1,0 +1,4 @@
+ignore:
+  - 'db/schema.rb'
+  - 'config/environments/production.rb'
+  - 'config/puma.rb'

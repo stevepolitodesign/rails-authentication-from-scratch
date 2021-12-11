@@ -21,7 +21,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
         user: {
           email: "some_unique_email@example.com",
           password: "password",
-          password_confirmation: "password",
+          password_confirmation: "password"
         }
       }
     end
@@ -34,7 +34,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
           user: {
             email: "some_unique_email@example.com",
             password: "password",
-            password_confirmation: "password",
+            password_confirmation: "password"
           }
         }
       end
@@ -51,7 +51,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
           user: {
             email: "some_unique_email@example.com",
             password: "password",
-            password_confirmation: "wrong_password",
+            password_confirmation: "wrong_password"
           }
         }
       end
@@ -107,7 +107,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
 
     assert_not_nil flash[:notice]
     assert_equal current_email, @confirmed_user.reload.email
-  end  
+  end
 
   test "should update password" do
     login(@confirmed_user)
@@ -116,7 +116,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
       user: {
         current_password: "password",
         password: "new_password",
-        password_confirmation: "new_password",
+        password_confirmation: "new_password"
       }
     }
 
@@ -131,12 +131,12 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
       user: {
         current_password: "wrong_password",
         password: "new_password",
-        password_confirmation: "new_password",
+        password_confirmation: "new_password"
       }
     }
 
     assert_response :unprocessable_entity
-  end  
+  end
 
   test "should delete user" do
     login(@confirmed_user)
@@ -147,5 +147,4 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to root_path
     assert_not_nil flash[:notice]
   end
-
 end

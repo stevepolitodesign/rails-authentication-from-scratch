@@ -19,6 +19,5 @@ class UserMailerTest < ActionMailer::TestCase
     assert_equal [@user.email], mail.to
     assert_equal [User::MAILER_FROM_EMAIL], mail.from
     assert_match @user.password_reset_token, mail.body.encoded
-  end  
-
+  end
 end

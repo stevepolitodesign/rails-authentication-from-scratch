@@ -17,7 +17,7 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     get login_path
     assert_redirected_to root_path
   end
-  
+
   test "should login if confirmed" do
     post login_path, params: {
       user: {
@@ -48,9 +48,9 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     login @confirmed_user, remember_user: true
 
     delete logout_path
-   
+
     # FIXME: Expected "" to be nil.
-    # When I run byebug in SessionsController#destroy cookies[:remember_token] does == nil. 
+    # When I run byebug in SessionsController#destroy cookies[:remember_token] does == nil.
     # I think this might be a bug in Rails?
     # assert_nil cookies[:remember_token]
     assert cookies[:remember_token].blank?
@@ -59,7 +59,6 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil flash[:notice]
   end
 
-  
   test "should not login if unconfirmed" do
     post login_path, params: {
       user: {
@@ -70,7 +69,7 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil flash[:alert]
     assert_nil current_user
     assert_redirected_to new_confirmation_path
-  end  
+  end
 
   test "should handle invalid login" do
     post login_path, params: {
@@ -92,11 +91,11 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to root_path
     assert_not_nil flash[:notice]
   end
-  
+
   test "should not logout if anonymous" do
     login @confirmed_user
 
     delete logout_path
-    assert_redirected_to root_path 
+    assert_redirected_to root_path
   end
 end

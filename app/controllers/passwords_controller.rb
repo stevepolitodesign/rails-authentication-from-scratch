@@ -17,7 +17,7 @@ class PasswordsController < ApplicationController
 
   def edit
     @user = User.find_by(password_reset_token: params[:password_reset_token])
-    if @user && @user.unconfirmed?
+    if @user.present? && @user.unconfirmed?
       redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
     elsif @user.nil? || @user.password_reset_token_has_expired?
       redirect_to new_password_path, alert: "Invalid or expired token."
@@ -38,7 +38,7 @@ class PasswordsController < ApplicationController
         redirect_to login_path, notice: "Signed in."
       else
         flash[:alert] = @user.errors.full_messages.to_sentence
-        render :edit        
+        render :edit
       end
     else
       flash[:alert] = "Incorrect email or password."
