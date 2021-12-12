@@ -361,7 +361,7 @@ end
 > **What's Going On Here?**
 > 
 > - The `MAILER_FROM_EMAIL` constant is a way for us to set the email used in the `UserMailer`. This is optional.
-> - The `send_confirmation_email!` method will create a new `confirmation_token` and update the value of `confirmation_sent_at`. This is to ensure confirmation links expire and cannot be reused. It will also send a the confirmation email to the user.
+> - The `send_confirmation_email!` method will create a new `confirmation_token` and update the value of `confirmation_sent_at`. This is to ensure confirmation links expire and cannot be reused. It will also send the confirmation email to the user.
 > - We call [update_columns](https://api.rubyonrails.org/classes/ActiveRecord/Persistence.html#method-i-update_columns) so that the `updated_at/updated_on` columns are not updated. This is personal preference, but those columns should typically only be updated when the user updates their email or password.
 > - The links in the mailer will take the user to `ConfirmationsController#edit` at which point they'll be confirmed.
 
@@ -431,7 +431,7 @@ class Current < ActiveSupport::CurrentAttributes
 end
 ```
 
-2. Create a Concern to store helper methods that will be shared accross the application.
+2. Create a Concern to store helper methods that will be shared across the application.
 
 ```ruby
 # app/controllers/concerns/authentication.rb
@@ -563,7 +563,7 @@ end
 
 > **What's Going On Here?**
 > 
-> - The `create` method simply simply checks if the user exists and is confirmed. If they are, then we check their password. If the password is correct, we log them in via the `login` method we created in the `Authentication` Concern. Otherwise, we render a an alert.  
+> - The `create` method simply simply checks if the user exists and is confirmed. If they are, then we check their password. If the password is correct, we log them in via the `login` method we created in the `Authentication` Concern. Otherwise, we render an alert.  
 >   - We're able to call `user.authenticate` because of [has_secure_password](https://api.rubyonrails.org/classes/ActiveModel/SecurePassword/ClassMethods.html#method-i-has_secure_password)
 >   - Note that we call `downcase` on the email to account for case sensitivity when searching.
 > - The `destroy` method simply calls the `logout` method we created in the `Authentication` Concern.
@@ -748,10 +748,10 @@ end
 > 
 > - The `create` action will send an email to the user containing a link that will allow them to reset the password. The link will contain their `password_reset_token` which is unique and expires. Note that we call `downcase` on the email to account for case sensitivity when searching.
 >   - Note that we return `If that user exists we've sent instructions to their email.` even if the user is not found. This makes it difficult for a bad actor to use the reset form to see which email accounts exist on the application.
-> - The `edit` action renders simply renders the form for the user to update their password. It attempts to find a user by there `password_reset_token`. You can think of the `password_reset_token` as a way to identify the user  much like how we normally identify records by their ID. However, the `password_reset_token` is randomly generated and will expire so it's more secure.
+> - The `edit` action simply renders the form for the user to update their password. It attempts to find a user by their `password_reset_token`. You can think of the `password_reset_token` as a way to identify the user  much like how we normally identify records by their ID. However, the `password_reset_token` is randomly generated and will expire so it's more secure.
 > - The `new` action simply renders a form for the user to put their email address in to receive the password reset email. 
-> - The `update` also ensures the user is identified by their `password_reset_token`. It's not enough to just do this on the `edit` action since a bad actor could make a `PUT` request to the server and bypass the form.
->   - If the user exists and is confirmed and their password token has not expired, we update their password to the one they will set in the form. Otherwise we handle each failure case a little different.
+> - The `update` action also ensures the user is identified by their `password_reset_token`. It's not enough to just do this on the `edit` action since a bad actor could make a `PUT` request to the server and bypass the form.
+>   - If the user exists, is confirmed, and their password token has not expired, we update their password to the one they will set in the form. Otherwise we handle each failure case a little different.
 
 2. Update Routes.
 
@@ -765,7 +765,7 @@ end
 
 > **What's Going On Here?**
 >
-> -  We add `param: :password_reset_token` as a [named route parameter](https://guides.rubyonrails.org/routing.html#overriding-named-route-parameters) to the so that we can identify users by their `password_reset_token` and not `id`. This is similar to what we did with the confirmations routes, and ensures a user cannot be identified by their ID.
+> -  We add `param: :password_reset_token` as a [named route parameter](https://guides.rubyonrails.org/routing.html#overriding-named-route-parameters) to the route so that we can identify users by their `password_reset_token` and not `id`. This is similar to what we did with the confirmations routes, and ensures a user cannot be identified by their ID.
 
 3. Build forms.
 
@@ -874,7 +874,7 @@ end
 
 > **What's Going On Here?**
 >
-> - We add a `unconfirmed_email` to the `users_table` so that we have a place to store the email a user is trying to use after their account has been confirmed with their original email.
+> - We add an `unconfirmed_email` column to the `users_table` so that we have a place to store the email a user is trying to use after their account has been confirmed with their original email.
 > - We add `attr_accessor :current_password` so that we'll be able to use `f.password_field :current_password` in the user form (which doesn't exist yet). This will allow us to require the user to submit their current password before they can update their account.
 > - We ensure to format the `unconfirmed_email` before saving to the database. This ensures all data is saved consistently.
 > - We add validations to the `unconfirmed_email` column ensuring it's a valid email address and that it's not currently in use.
@@ -956,11 +956,11 @@ end
 
 > **What's Going On Here?**
 >
-> - We call `redirect_if_authenticated` before editing, destroying or updating a user, since only an authenticated use should be able to do this.
+> - We call `redirect_if_authenticated` before editing, destroying or updating a user, since only an authenticated user should be able to do this.
 > - We update the `create` method to accept `create_user_params` (formerly `user_params`). This is because we're going to require different parameters for creating an account vs. editing an account.
 > - The `destroy` action simply deletes the user and logs them out. Note that we're calling `current_user`, so this action can only be scoped to the user who is logged in.
 > - The `edit` action simply assigns `@user` to the `current_user` so that we have access to the user in the edit form.
-> - The `update` action first checks if their password is correct. Note that we're passing this in as `current_password` and not `password`. This is because we still want a user to be able to change their password and therefor we need another parameter to store this value. This is also why we have a private `update_user_params` method.
+> - The `update` action first checks if their password is correct. Note that we're passing this in as `current_password` and not `password`. This is because we still want a user to be able to change their password and therefore we need another parameter to store this value. This is also why we have a private `update_user_params` method.
 >   - If the user is updating their email address (via `unconfirmed_email`) we send a confirmation email to that new email address before setting it as the `email` value.
 >   - We force a user to always put in their `current_password` as an extra security measure incase someone leaves their browser open on a public computer.
 
@@ -1080,7 +1080,7 @@ end
 
 > **What's Going On Here?**
 >
-> - Just like the `confirmation_token` and `password_reset_token` columns, we call [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) on the `remember_token`. This ensures that the value for this column will be set when the record is created. This value will be used later to securely identify the user.
+> - Just like the `confirmation_token` and `password_reset_token` columns, we call [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) with `remember_token`. This ensures that the value for this column will be set when the record is created. This value will be used later to securely identify the user.
 
 ## Step 15: Update Authentication Concern
 
@@ -1118,7 +1118,7 @@ end
 >
 > - The `remember` method first regenerates a new `remember_token` to ensure these values are being rotated and can't be used more than once. We get the `regenerate_remember_token` method from [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token). Next, we assigned this value to a [cookie](https://api.rubyonrails.org/classes/ActionDispatch/Cookies.html). The call to [permanent](https://api.rubyonrails.org/classes/ActionDispatch/Cookies/ChainedCookieJars.html#method-i-permanent) ensures the cookie won't expire until 20 years from now. The call to [encrypted](https://api.rubyonrails.org/classes/ActionDispatch/Cookies/ChainedCookieJars.html#method-i-encrypted) ensures the value will be encrypted. This is vital since this value is used to identify the user and is being set in the browser.
 > - The `forget` method deletes the cookie and regenerates a new `remember_token` to ensure these values are being rotated and can't be used more than once.
-> - We updated the `current_user` method by adding a conditional to first try and find the user by the session, and then fallback to finding the user be the cookie. This is the logic that allows a user to completely exit their browser and still remain logged in when they return to the website since the cookie will still be set.
+> - We updated the `current_user` method by adding a conditional to first try to find the user by the session, and then fallback to finding the user by the cookie. This is the logic that allows a user to completely exit their browser and still remain logged in when they return to the website since the cookie will still be set.
 
 ## Step 16: Update Sessions Controller
 
@@ -1229,5 +1229,5 @@ end
 
 > **What's Going On Here?**
 >
-> - The `after_login_path` variable it set to be whatever is in the `session[:user_return_to]`. If there's nothing in `session[:user_return_to]` then it defaults to the `root_path`.
+> - The `after_login_path` variable is set to be whatever is in `session[:user_return_to]`. If there's nothing in `session[:user_return_to]` then it defaults to the `root_path`.
 > - Note that we call this method before calling `login`. This is because `login` calls `reset_session` which would deleted the `session[:user_return_to]`.
