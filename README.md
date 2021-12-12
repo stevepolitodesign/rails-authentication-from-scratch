@@ -136,7 +136,7 @@ class User < ApplicationRecord
   end
 
   def unconfirmed?
-    confirmed_at.nil?
+    !confirmed?
   end
 
   private

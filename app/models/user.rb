@@ -63,7 +63,7 @@ class User < ApplicationRecord
   end
 
   def unconfirmed?
-    confirmed_at.nil?
+    !confirmed?
   end
 
   def unconfirmed_or_reconfirming?
