@@ -84,7 +84,7 @@ end
 > - The `confirmation_token` column will store a random value created through the [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) method when a record is saved. This will be used to identify users in a secure way when we need to confirm their email address. We add `null: false` to prevent empty values and also add a unique index to ensure that no two users will have the same `confirmation_token`. You can think of this as a secure alternative to the `id` column.
 > - The `confirmation_sent_at` column will be used to ensure a confirmation has not expired. This is an added layer of security to prevent a `confirmation_token` from being used multiple times.
 > - The `confirmed_at` column will be set when a user confirms their account. This will help us determine who has confirmed their account and who has not.
-> - The `password_digest` column will store a hashed version of the user's password. This is provided by the [has_secure_password(](https://api.rubyonrails.org/classes/ActiveModel/SecurePassword/ClassMethods.html#method-i-has_secure_password) method.
+> - The `password_digest` column will store a hashed version of the user's password. This is provided by the [has_secure_password](https://api.rubyonrails.org/classes/ActiveModel/SecurePassword/ClassMethods.html#method-i-has_secure_password) method.
 
 3. Run migrations.
 
