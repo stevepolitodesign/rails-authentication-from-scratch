@@ -1233,3 +1233,65 @@ end
 >
 > - The `after_login_path` variable it set to be whatever is in the `session[:user_return_to]`. If there's nothing in `session[:user_return_to]` then it defaults to the `root_path`.
 > - Note that we call this method before calling `login`. This is because `login` calls `reset_session` which would deleted the `session[:user_return_to]`.
+
+## Step 17: Account for Timing Attacks
+
+1. Update the User model.
+
+**[Note that this class method will be available in Rails 7.1](https://edgeapi.rubyonrails.org/classes/ActiveRecord/SecurePassword/ClassMethods.html#method-i-authenticate_by)**
+
+```ruby
+# app/models/user.rb
+class User < ApplicationRecord
+  ...
+  def self.authenticate_by(attributes)
+    passwords, identifiers = attributes.to_h.partition do |name, value|
+      !has_attribute?(name) && has_attribute?("#{name}_digest")
+    end.map(&:to_h)
+
+    raise ArgumentError, "One or more password arguments are required" if passwords.empty?
+    raise ArgumentError, "One or more finder arguments are required" if identifiers.empty?
+    if (record = find_by(identifiers))
+      record if passwords.count { |name, value| record.public_send(:"authenticate_#{name}", value) } == passwords.size
+    else
+      new(passwords)
+      nil
+    end
+  end  
+  ...
+end
+```
+
+> **What's Going On Here?**
+>
+> - This class method serves to find a user using the non-password attributes (such as email), and then authenticates that record using the password attributes. Regardless of whether a user is found or authentication succeeds, `authenticate_by` will take the same amount of time. This prevents [timing-based enumeration attacks](https://en.wikipedia.org/wiki/Timing_attack), wherein an attacker can determine if a password record exists even without knowing the password.
+
+2. Update the Sessions Controller.
+
+```ruby
+# app/controllers/sessions_controller.rb
+class SessionsController < ApplicationController
+  ...
+  def create
+    @user = User.authenticate_by(email: params[:user][:email].downcase, password: params[:user][:password])
+    if @user
+      if @user.unconfirmed?
+        redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
+      else
+        after_login_path = session[:user_return_to] || root_path
+        login @user
+        remember(@user) if params[:user][:remember_me] == "1"
+        redirect_to after_login_path, notice: "Signed in."
+      end
+    else
+      flash.now[:alert] = "Incorrect email or password."
+      render :new
+    end
+  end
+  ...
+end
+```
+
+> **What's Going On Here?**
+>
+> - We refactor the `create` method to always start by finding and authenticating the user. Not only does this prevent timing attacks, but it also prevents accidentally leaking email addresses. This is because we were originally checking if a user was confirmed before authenticating them. That means a bad actor could try and sign in with an email address to see if it exists on the system without needing to know the password.
