@@ -17,6 +17,21 @@ class User < ApplicationRecord
   validates :unconfirmed_email, format: {with: URI::MailTo::EMAIL_REGEXP, allow_blank: true}
   validate :unconfirmed_email_must_be_available
 
+  def self.authenticate_by(attributes)
+    passwords, identifiers = attributes.to_h.partition do |name, value|
+      !has_attribute?(name) && has_attribute?("#{name}_digest")
+    end.map(&:to_h)
+
+    raise ArgumentError, "One or more password arguments are required" if passwords.empty?
+    raise ArgumentError, "One or more finder arguments are required" if identifiers.empty?
+    if (record = find_by(identifiers))
+      record if passwords.count { |name, value| record.public_send(:"authenticate_#{name}", value) } == passwords.size
+    else
+      new(passwords)
+      nil
+    end
+  end
+
   def confirm!
     if unconfirmed_email.present?
       update(email: unconfirmed_email, unconfirmed_email: nil)

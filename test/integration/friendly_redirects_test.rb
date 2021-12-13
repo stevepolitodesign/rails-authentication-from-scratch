@@ -14,7 +14,7 @@ class FriendlyRedirectsTest < ActionDispatch::IntegrationTest
     assert_redirected_to account_path
   end
 
-  test "redirects to root path aafter sign in" do
+  test "redirects to root path after sign in" do
     get login_path
     login(@confirmed_user)
 
