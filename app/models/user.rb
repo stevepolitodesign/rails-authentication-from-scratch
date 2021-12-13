@@ -2,7 +2,6 @@ class User < ApplicationRecord
   CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS = 10.minutes.to_i
   MAILER_FROM_EMAIL = "no-reply@example.com"
   PASSWORD_RESET_TOKEN_EXPIRATION_IN_SECONDS = 10.minutes.to_i
-  VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
 
   attr_accessor :current_password
 
@@ -14,8 +13,8 @@ class User < ApplicationRecord
   before_save :downcase_email
   before_save :downcase_unconfirmed_email
 
-  validates :email, format: {with: VALID_EMAIL_REGEX}, presence: true, uniqueness: true
-  validates :unconfirmed_email, format: {with: VALID_EMAIL_REGEX, allow_blank: true}
+  validates :email, format: {with: URI::MailTo::EMAIL_REGEXP}, presence: true, uniqueness: true
+  validates :unconfirmed_email, format: {with: URI::MailTo::EMAIL_REGEXP, allow_blank: true}
   validate :unconfirmed_email_must_be_available
 
   def confirm!

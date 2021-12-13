@@ -34,11 +34,12 @@ rails db:migrate
 ```ruby
 # app/models/user.rb
 class User < ApplicationRecord
-  VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
-
   before_save :downcase_email
 
-  validates :email, format: {with: VALID_EMAIL_REGEX}, presence: true, uniqueness: true
+  validates :email,
+    format: { with: URI::MailTo::EMAIL_REGEXP },
+    presence: true,
+    uniqueness: true
 
   private
 
@@ -49,11 +50,12 @@ end
 ```
 
 > **What's Going On Here?**
-> 
+>
 > - We prevent empty values from being saved into the email column through a `null: false` constraint in addition to the [presence](https://guides.rubyonrails.org/active_record_validations.html#presence) validation.
 > - We enforce unique email addresses at the database level through `add_index :users, :email, unique: true` in addition to a [uniqueness](https://guides.rubyonrails.org/active_record_validations.html#uniqueness) validation.
 > - We ensure all emails are valid through a [format](https://guides.rubyonrails.org/active_record_validations.html#format) validation.
 > - We save all emails to the database in a downcase format via a [before_save](https://api.rubyonrails.org/v6.1.4/classes/ActiveRecord/Callbacks/ClassMethods.html#method-i-before_save) callback such that the values are saved in a consistent format.
+> - We use [URI::MailTo::EMAIL_REGEXP](https://ruby-doc.org/stdlib-3.0.0/libdoc/uri/rdoc/URI/MailTo.html) that comes with Ruby to valid that the email address is properly formatted.
 
 ## Step 2: Add Confirmation and Password Columns to Users Table
 
@@ -80,7 +82,7 @@ end
 ```
 
 > **What's Going On Here?**
-> 
+>
 > - The `confirmation_token` column will store a random value created through the [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) method when a record is saved. This will be used to identify users in a secure way when we need to confirm their email address. We add `null: false` to prevent empty values and also add a unique index to ensure that no two users will have the same `confirmation_token`. You can think of this as a secure alternative to the `id` column.
 > - The `confirmation_sent_at` column will be used to ensure a confirmation has not expired. This is an added layer of security to prevent a `confirmation_token` from being used multiple times.
 > - The `confirmed_at` column will be set when a user confirms their account. This will help us determine who has confirmed their account and who has not.
@@ -146,7 +148,7 @@ end
 ```
 
 > **What's Going On Here?**
-> 
+>
 > - The `has_secure_password` method is added to give us an [API](https://api.rubyonrails.org/classes/ActiveModel/SecurePassword/ClassMethods.html#method-i-has_secure_password) to work with the `password_digest` column.
 > - The `has_secure_token :confirmation_token` method is added to give us an [API](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) to work with the `confirmation_token` column.
 > - The `confirm!` method will be called when a user confirms their email address. We still need to build this feature.
@@ -300,7 +302,7 @@ end
 ```
 
 > **What's Going On Here?**
-> 
+>
 > - The `create` action will be used to resend confirmation instructions to a user who is unconfirmed. We still need to build this mailer, and we still need to send this mailer when a user initially signs up. This action will be requested via the form on `app/views/confirmations/new.html.erb`. Note that we call `downcase` on the email to account for case sensitivity when searching.
 > - The `edit` action is used to confirm a user's email. This will be the page that a user lands on when they click the confirmation link in their email. We still need to build this. Note that we're looking up a user through their `confirmation_token` and not their email or ID. This is because The `confirmation_token` is randomly generated and can't be easily guessed unlike an email or numeric ID. This is also why we added `param: :confirmation_token` as a [named route parameter](https://guides.rubyonrails.org/routing.html#overriding-named-route-parameters). Note that we check if their confirmation token has expired before confirming their account.
 
@@ -311,7 +313,7 @@ Now we need a way to send a confirmation email to our users in order for them to
 1. Create confirmation mailer.
 
 ```bash
-rails g mailer User confirmation 
+rails g mailer User confirmation
 ```
 
 ```ruby
@@ -359,7 +361,7 @@ end
 ```
 
 > **What's Going On Here?**
-> 
+>
 > - The `MAILER_FROM_EMAIL` constant is a way for us to set the email used in the `UserMailer`. This is optional.
 > - The `send_confirmation_email!` method will create a new `confirmation_token` and update the value of `confirmation_sent_at`. This is to ensure confirmation links expire and cannot be reused. It will also send a the confirmation email to the user.
 > - We call [update_columns](https://api.rubyonrails.org/classes/ActiveRecord/Persistence.html#method-i-update_columns) so that the `updated_at/updated_on` columns are not updated. This is personal preference, but those columns should typically only be updated when the user updates their email or password.
@@ -367,11 +369,11 @@ end
 
 3. Configure Action Mailer so that links work locally.
 
-Add a host to the test and development (and later the production) environments so that [urls will work in mailers](https://guides.rubyonrails.org/action_mailer_basics.html#generating-urls-in-action-mailer-views). 
+Add a host to the test and development (and later the production) environments so that [urls will work in mailers](https://guides.rubyonrails.org/action_mailer_basics.html#generating-urls-in-action-mailer-views).
 
 ```ruby
 # config/environments/test.rb
-Rails.application.configure do  
+Rails.application.configure do
   ...
   config.action_mailer.default_url_options = { host: "example.com" }
 end
@@ -379,7 +381,7 @@ end
 
 ```ruby
 # config/environments/development.rb
-Rails.application.configure do  
+Rails.application.configure do
   ...
   config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
 end
@@ -480,15 +482,15 @@ end
 ```
 
 > **What's Going On Here?**
-> 
-> - The `Current` class inherits from [ActiveSupport::CurrentAttributes](https://api.rubyonrails.org/classes/ActiveSupport/CurrentAttributes.html) which allows us to keep all per-request attributes easily available to the whole system. In essence this will allow us to set a current user and have access to that user during each request to the server. 
+>
+> - The `Current` class inherits from [ActiveSupport::CurrentAttributes](https://api.rubyonrails.org/classes/ActiveSupport/CurrentAttributes.html) which allows us to keep all per-request attributes easily available to the whole system. In essence this will allow us to set a current user and have access to that user during each request to the server.
 > - The `Authentication` Concern provides an interface for logging the user in and out. We load it into the `ApplicationController` so that it will be used acrosss the whole application.
 >   - The `login` method first [resets the session](https://api.rubyonrails.org/classes/ActionController/Metal.html#method-i-reset_session) to account for [session fixation](https://guides.rubyonrails.org/security.html#session-fixation-countermeasures).
 >   - We set the user's ID in the [session](https://guides.rubyonrails.org/action_controller_overview.html#session) so that we can have access to the user across requests. The user's ID won't be stored in plain text. The cookie data is cryptographically signed to make it tamper-proof. And it is also encrypted so anyone with access to it can't read its contents.
 >   - The `logout` method simply [resets the session](https://api.rubyonrails.org/classes/ActionController/Metal.html#method-i-reset_session).
 >   - The `redirect_if_authenticated` method checks to see if the user is logged in. If they are, they'll be redirected to the `root_path`. This will be useful on pages an authenticated user should not be able to access, such as the login page.
 >   - The `current_user` method returns a `User` and sets it as the user on the `Current` class we created. We call the `before_action` [filter](https://guides.rubyonrails.org/action_controller_overview.html#filters) so that we have access to the current user before each request. We also add this as a [helper_method](https://api.rubyonrails.org/classes/AbstractController/Helpers/ClassMethods.html#method-i-helper_method) so that we have access to `current_user` in the views.
->   - The `user_signed_in?` method simply returns true or false depending on whether the user is signed in or not. This is helpful for conditionally rendering items in views. 
+>   - The `user_signed_in?` method simply returns true or false depending on whether the user is signed in or not. This is helpful for conditionally rendering items in views.
 
 ## Step 7: Create Login Page
 
@@ -513,7 +515,7 @@ class SessionsController < ApplicationController
         redirect_to root_path, notice: "Signed in."
       else
         flash[:alert] = "Incorrect email or password."
-        render :new        
+        render :new
       end
     else
       flash[:alert] = "Incorrect email or password."
@@ -562,12 +564,12 @@ end
 ```
 
 > **What's Going On Here?**
-> 
-> - The `create` method simply simply checks if the user exists and is confirmed. If they are, then we check their password. If the password is correct, we log them in via the `login` method we created in the `Authentication` Concern. Otherwise, we render a an alert.  
+>
+> - The `create` method simply simply checks if the user exists and is confirmed. If they are, then we check their password. If the password is correct, we log them in via the `login` method we created in the `Authentication` Concern. Otherwise, we render a an alert.
 >   - We're able to call `user.authenticate` because of [has_secure_password](https://api.rubyonrails.org/classes/ActiveModel/SecurePassword/ClassMethods.html#method-i-has_secure_password)
 >   - Note that we call `downcase` on the email to account for case sensitivity when searching.
 > - The `destroy` method simply calls the `logout` method we created in the `Authentication` Concern.
-> - The login form is passed a `scope: :user` option so that the params are namespaced as `params[:user][:some_value]`. This is not required, but it helps keep things organized. 
+> - The login form is passed a `scope: :user` option so that the params are namespaced as `params[:user][:some_value]`. This is not required, but it helps keep things organized.
 
 ## Step 8: Update Existing Controllers
 
@@ -583,7 +585,7 @@ class ConfirmationsController < ApplicationController
     if @user.present? && @user.confirmation_token_has_not_expired?
       @user.confirm!
       login @user
-      ...  
+      ...
     else
     end
     ...
@@ -728,7 +730,7 @@ class PasswordsController < ApplicationController
         redirect_to login_path, notice: "Signed in."
       else
         flash[:alert] = @user.errors.full_messages.to_sentence
-        render :edit        
+        render :edit
       end
     else
       flash[:alert] = "Incorrect email or password."
@@ -745,11 +747,11 @@ end
 ```
 
 > **What's Going On Here?**
-> 
+>
 > - The `create` action will send an email to the user containing a link that will allow them to reset the password. The link will contain their `password_reset_token` which is unique and expires. Note that we call `downcase` on the email to account for case sensitivity when searching.
 >   - Note that we return `If that user exists we've sent instructions to their email.` even if the user is not found. This makes it difficult for a bad actor to use the reset form to see which email accounts exist on the application.
 > - The `edit` action renders simply renders the form for the user to update their password. It attempts to find a user by there `password_reset_token`. You can think of the `password_reset_token` as a way to identify the user  much like how we normally identify records by their ID. However, the `password_reset_token` is randomly generated and will expire so it's more secure.
-> - The `new` action simply renders a form for the user to put their email address in to receive the password reset email. 
+> - The `new` action simply renders a form for the user to put their email address in to receive the password reset email.
 > - The `update` also ensures the user is identified by their `password_reset_token`. It's not enough to just do this on the `edit` action since a bad actor could make a `PUT` request to the server and bypass the form.
 >   - If the user exists and is confirmed and their password token has not expired, we update their password to the one they will set in the form. Otherwise we handle each failure case a little different.
 
@@ -1129,7 +1131,7 @@ end
 class SessionsController < ApplicationController
   ...
   before_action :authenticate_user!, only: [:destroy]
-  
+
   def create
     ...
     if @user
@@ -1140,7 +1142,7 @@ class SessionsController < ApplicationController
         remember(@user) if params[:user][:remember_me] == "1"
         ...
       else
-        ...  
+        ...
       end
     else
       ...
@@ -1197,7 +1199,7 @@ end
 
 > **What's Going On Here?**
 >
-> - The `store_location` method stores the [request.original_url](https://api.rubyonrails.org/classes/ActionDispatch/Request.html#method-i-original_url) in the [session](https://guides.rubyonrails.org/action_controller_overview.html#session) so it can be retrieved later. We only do this if the request made was a get request. 
+> - The `store_location` method stores the [request.original_url](https://api.rubyonrails.org/classes/ActionDispatch/Request.html#method-i-original_url) in the [session](https://guides.rubyonrails.org/action_controller_overview.html#session) so it can be retrieved later. We only do this if the request made was a get request.
 > - We call `store_location` in the `authenticate_user!` method so that we can save the path to the page the user was trying to visit before they were redirected to the login page. We need to do this before visiting the login page otherwise the call to `request.original_url` will always return the url to the login page.
 
 2. Update Sessions Controller.
