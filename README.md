@@ -514,11 +514,11 @@ class SessionsController < ApplicationController
         login @user
         redirect_to root_path, notice: "Signed in."
       else
-        flash[:alert] = "Incorrect email or password."
-        render :new
+        flash.now[:alert] = "Incorrect email or password."
+        render :new        
       end
     else
-      flash[:alert] = "Incorrect email or password."
+      flash.now[:alert] = "Incorrect email or password."
       render :new
     end
   end
@@ -729,11 +729,11 @@ class PasswordsController < ApplicationController
       elsif @user.update(password_params)
         redirect_to login_path, notice: "Signed in."
       else
-        flash[:alert] = @user.errors.full_messages.to_sentence
-        render :edit
+        flash.now[:alert] = @user.errors.full_messages.to_sentence
+        render :edit        
       end
     else
-      flash[:alert] = "Incorrect email or password."
+      flash.now[:alert] = "Incorrect email or password."
       render :new
     end
   end
