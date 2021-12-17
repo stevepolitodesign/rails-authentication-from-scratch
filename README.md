@@ -1316,3 +1316,92 @@ end
 > **What's Going On Here?**
 >
 > - We refactor the `create` method to always start by finding and authenticating the user. Not only does this prevent timing attacks, but it also prevents accidentally leaking email addresses. This is because we were originally checking if a user was confirmed before authenticating them. That means a bad actor could try and sign in with an email address to see if it exists on the system without needing to know the password.
+
+## Step 18: Account for Session Replay Attacks
+
+We're currently setting the user's ID in the session. Even though that value is encrypted, the encrypted value doesn't change since it's based on the user id which doesn't change. This means that if a bad actor were to get a copy of the session they would have access to a victim's account in perpetuity. One solution is to [rotate encrypted and signed cookie configurations](https://guides.rubyonrails.org/security.html#rotating-encrypted-and-signed-cookies-configurations). Another is to use a rotating value to identify the user. 
+
+You can read more about session replay attacks [here](https://binarysolo.chapter24.blog/avoiding-session-replay-attacks-in-rails/)
+
+1. Add a session_token column to users table.
+
+```bash
+rails g migration add add_session_token_to_users session_token:string
+```
+
+2. Update migration.
+```ruby
+# db/migrate/[timestamp]_add_session_token_to_users.rb
+class AddSessionTokenToUsers < ActiveRecord::Migration[6.1]
+  def change
+    add_column :users, :session_token, :string, null: false
+    add_index :users, :session_token, unique: true
+  end
+end
+```
+
+> **What's Going On Here?**
+>
+> - Similar to the `confirmation_token`, `password_reset_token` and `remember_token`, prevent the `session_token` from being null and enforce that it has a unique value.
+
+3. Update User Model.
+
+```ruby
+# app/models/user.rb
+class User < ApplicationRecord
+  ...
+  has_secure_token :session_token
+  ...
+end
+```
+
+4. Update Authentication Concern.
+
+```ruby
+# app/controllers/concerns/authentication.rb
+module Authentication
+  ...
+  def login(user)
+    reset_session
+    user.regenerate_session_token
+    session[:current_user_session_token] = user.reload.session_token
+  end
+  ...
+  def logout
+    user = current_user
+    reset_session
+    user.regenerate_session_token
+  end
+  ...
+  private
+
+  def current_user
+    Current.user = if session[:current_user_session_token].present?
+      User.find_by(session_token: session[:current_user_session_token])
+    elsif cookies.permanent.encrypted[:remember_token].present?
+      User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
+    end
+  end
+  ...
+end
+```
+
+> **What's Going On Here?**
+>
+> - We update the `login` method by adding a call to `user.regenerate_session_token`. This will reset the valid of the `session_token` through the [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) API. We then store that value in the session.
+> - We updated the `logout` method by first setting the `current_user` as a variable. This is because once we call `reset_session`, we loose access to the `current_user`. We then call `user.regenerate_session_token` which will update the value of the `session_token` on the user that just signed out.
+> - Finally we update the `current_user` method to look for the `session[:current_user_session_token]` instead of the `session[:current_user_id]` and to query for the User by the `session_token` value.
+
+5. Force SSL.
+
+```ruby
+# config/environments/production.rb
+Rails.application.configure do
+ ...
+  config.force_ssl = true
+end
+```
+
+> **What's Going On Here?**
+>
+> - We force SSL in production to prevent [session hijacking](https://guides.rubyonrails.org/security.html#session-hijacking). Even though the session in encrypted we want to prevent the cookie from exposed through an insecure network. If it were exposed, a bad actor could sign in as the victim.
