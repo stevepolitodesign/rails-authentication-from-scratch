@@ -203,4 +203,10 @@ class UserTest < ActiveSupport::TestCase
       assert_equal Time.current, @unconfirmed_user.reload.confirmed_at
     end
   end
+
+  test "should set session_token on create" do
+    @user.save!
+
+    assert_not_nil @user.reload.session_token
+  end
 end

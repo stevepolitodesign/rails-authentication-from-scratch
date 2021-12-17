@@ -9,6 +9,7 @@ class User < ApplicationRecord
   has_secure_token :confirmation_token
   has_secure_token :password_reset_token
   has_secure_token :remember_token
+  has_secure_token :session_token
 
   before_save :downcase_email
   before_save :downcase_unconfirmed_email
