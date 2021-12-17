@@ -160,9 +160,47 @@ class UserTest < ActiveSupport::TestCase
     end
   end
 
-  test "unconfirmed_email must be available" do
+  test "unconfirmed_email does not need to be available" do
     @user.save!
     @user.unconfirmed_email = @user.email
-    assert_not @user.valid?
+    assert @user.valid?
+  end
+
+  test ".confirm! should return false if already confirmed" do
+    @confirmed_user = User.new(email: "unique_email@example.com", password: "password", password_confirmation: "password", confirmed_at: Time.current)
+
+    assert_not @confirmed_user.confirm!
+  end
+
+  test ".confirm! should update email if reconfirming" do
+    @reconfirmed_user = User.new(email: "unique_email@example.com", password: "password", password_confirmation: "password", confirmed_at: 1.week.ago, unconfirmed_email: "unconfirmed_email@example.com")
+    new_email = @reconfirmed_user.unconfirmed_email
+
+    freeze_time do
+      @reconfirmed_user.confirm!
+
+      assert_equal new_email, @reconfirmed_user.reload.email
+      assert_nil @reconfirmed_user.reload.unconfirmed_email
+      assert_equal Time.current, @reconfirmed_user.reload.confirmed_at
+    end
+  end
+
+  test ".confirm! should not update email if already taken" do
+    @confirmed_user = User.create!(email: "user1@example.com", password: "password", password_confirmation: "password")
+    @reconfirmed_user = User.create!(email: "user2@example.com", password: "password", password_confirmation: "password", confirmed_at: 1.week.ago, unconfirmed_email: @confirmed_user.email)
+
+    freeze_time do
+      assert_not @reconfirmed_user.confirm!
+    end
+  end
+
+  test ".confirm! should set confirmed_at" do
+    @unconfirmed_user = User.create!(email: "unique_email@example.com", password: "password", password_confirmation: "password")
+
+    freeze_time do
+      @unconfirmed_user.confirm!
+
+      assert_equal Time.current, @unconfirmed_user.reload.confirmed_at
+    end
   end
 end

@@ -15,9 +15,12 @@ class ConfirmationsController < ApplicationController
   def edit
     @user = User.find_by(confirmation_token: params[:confirmation_token])
     if @user.present? && @user.unconfirmed_or_reconfirming? && @user.confirmation_token_has_not_expired?
-      @user.confirm!
-      login @user
-      redirect_to root_path, notice: "Your account has been confirmed."
+      if @user.confirm!
+        login @user
+        redirect_to root_path, notice: "Your account has been confirmed."
+      else
+        redirect_to new_confirmation_path, alert: "Something went wrong."
+      end
     else
       redirect_to new_confirmation_path, alert: "Invalid token."
     end

@@ -34,6 +34,21 @@ class ConfirmationsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil flash[:notice]
   end
 
+  test "should not update email address if already taken" do
+    original_email = @reconfirmed_user.email
+    @reconfirmed_user.update(unconfirmed_email: @confirmed_user.email)
+
+    freeze_time do
+      @reconfirmed_user.send_confirmation_email!
+
+      get edit_confirmation_path(@reconfirmed_user.confirmation_token)
+
+      assert_equal original_email, @reconfirmed_user.reload.email
+      assert_redirected_to new_confirmation_path
+      assert_not_nil flash[:alert]
+    end
+  end
+
   test "should redirect if confirmation link expired" do
     travel_to 601.seconds.from_now
 

@@ -113,14 +113,13 @@ bundle install
 # app/models/user.rb
 class User < ApplicationRecord
   CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS = 10.minutes.to_i
-  VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
 
   has_secure_password
   has_secure_token :confirmation_token
 
   before_save :downcase_email
 
-  validates :email, format: {with: VALID_EMAIL_REGEX}, presence: true, uniqueness: true
+  validates :email, format: {with: URI::MailTo::EMAIL_REGEXP}, presence: true, uniqueness: true
 
   def confirm!
     update_columns(confirmed_at: Time.current)
@@ -817,14 +816,17 @@ class User < ApplicationRecord
   ...
   before_save :downcase_unconfirmed_email
   ...
-  validates :unconfirmed_email, format: {with: VALID_EMAIL_REGEX, allow_blank: true}
-  validate :unconfirmed_email_must_be_available
+  validates :unconfirmed_email, format: {with: URI::MailTo::EMAIL_REGEXP, allow_blank: true}
 
   def confirm!
-    if unconfirmed_email.present?
-      update(email: unconfirmed_email, unconfirmed_email: nil)
+    if unconfirmed_or_reconfirming?
+      if unconfirmed_email.present?
+        return false unless update(email: unconfirmed_email, unconfirmed_email: nil)
+      end
+      update_columns(confirmed_at: Time.current)
+    else
+      false
     end
-    update_columns(confirmed_at: Time.current)
   end
   ...
   def confirmable_email
@@ -850,15 +852,18 @@ class User < ApplicationRecord
     unconfirmed_email = unconfirmed_email.downcase
   end
 
-  def unconfirmed_email_must_be_available
-    return if unconfirmed_email.nil?
-    if User.find_by(email: unconfirmed_email.downcase)
-      errors.add(:unconfirmed_email, "is already in use.")
-    end
-  end
-
 end
 ```
+
+> **What's Going On Here?**
+>
+> - We add a `unconfirmed_email` column to the `users_table` so that we have a place to store the email a user is trying to use after their account has been confirmed with their original email.
+> - We add `attr_accessor :current_password` so that we'll be able to use `f.password_field :current_password` in the user form (which doesn't exist yet). This will allow us to require the user to submit their current password before they can update their account.
+> - We ensure to format the `unconfirmed_email` before saving to the database. This ensures all data is saved consistently.
+> - We add validations to the `unconfirmed_email` column ensuring it's a valid email address.
+> - We update the `confirm!` method to set the `email` column to the value of the `unconfirmed_email` column, and then clear out the `unconfirmed_email` column. This will only happen if a user is trying to confirm a new email address. Note that we return `false` if updating the email address fails. This could happen if a user tries to confirm an email address that has already been confirmed. 
+> - We add the `confirmable_email` method so that we can call the correct email in the the updated `UserMailer`.
+> - We add `reconfirming?` and `unconfirmed_or_reconfirming?` to help us determine what state a user is in. This will come in handy later in our controllers.
 
 3. Update User Mailer.
 
@@ -871,18 +876,34 @@ class UserMailer < ApplicationMailer
     mail to: @user.confirmable_email, subject: "Confirmation Instructions"
   end
 end
+```
 
+3. Update Confirmations Controller.
+
+```ruby
+# README.md
+class ConfirmationsController < ApplicationController
+  ...
+  def edit
+    ...
+    if @user.present? && @user.unconfirmed_or_reconfirming? && @user.confirmation_token_has_not_expired?
+      if @user.confirm!
+        login @user
+        redirect_to root_path, notice: "Your account has been confirmed."
+      else
+        redirect_to new_confirmation_path, alert: "Something went wrong."
+      end
+    else
+      ...
+    end
+  end
+  ...
+end
 ```
 
 > **What's Going On Here?**
 >
-> - We add a `unconfirmed_email` to the `users_table` so that we have a place to store the email a user is trying to use after their account has been confirmed with their original email.
-> - We add `attr_accessor :current_password` so that we'll be able to use `f.password_field :current_password` in the user form (which doesn't exist yet). This will allow us to require the user to submit their current password before they can update their account.
-> - We ensure to format the `unconfirmed_email` before saving to the database. This ensures all data is saved consistently.
-> - We add validations to the `unconfirmed_email` column ensuring it's a valid email address and that it's not currently in use.
-> - We update the `confirm!` method to set the `email` column to the value of the `unconfirmed_email` column, and then clear out the `unconfirmed_email` column. This will only happen if a user is trying to confirm a new email address.
-> - We add the `confirmable_email` method so that we can call the correct email in the the updated `UserMailer`.
-> - We add `reconfirming?` and `unconfirmed_or_reconfirming?` to help us determine what state a user is in. This will come in handy later in our controllers.
+> - We update the `edit` method to account for the return value of `@user.confirm!`. If for some reason `@user.confirm!` returns `false` (which would most likely happen if the email has already been taken) then we render a generic error. This prevents leaking email addresses.
 
 ## Step 12: Update Users Controller
 
