@@ -15,7 +15,6 @@ class User < ApplicationRecord
 
   validates :email, format: {with: URI::MailTo::EMAIL_REGEXP}, presence: true, uniqueness: true
   validates :unconfirmed_email, format: {with: URI::MailTo::EMAIL_REGEXP, allow_blank: true}
-  validate :unconfirmed_email_must_be_available
 
   def self.authenticate_by(attributes)
     passwords, identifiers = attributes.to_h.partition do |name, value|
@@ -33,10 +32,14 @@ class User < ApplicationRecord
   end
 
   def confirm!
-    if unconfirmed_email.present?
-      update(email: unconfirmed_email, unconfirmed_email: nil)
+    if unconfirmed_or_reconfirming?
+      if unconfirmed_email.present?
+        return false unless update(email: unconfirmed_email, unconfirmed_email: nil)
+      end
+      update_columns(confirmed_at: Time.current)
+    else
+      false
     end
-    update_columns(confirmed_at: Time.current)
   end
 
   def confirmed?
@@ -94,12 +97,5 @@ class User < ApplicationRecord
   def downcase_unconfirmed_email
     return if unconfirmed_email.nil?
     self.unconfirmed_email = unconfirmed_email.downcase
-  end
-
-  def unconfirmed_email_must_be_available
-    return if unconfirmed_email.nil?
-    if User.find_by(email: unconfirmed_email.downcase)
-      errors.add(:unconfirmed_email, "is already in use.")
-    end
   end
 end
