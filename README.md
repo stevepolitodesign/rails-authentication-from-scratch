@@ -44,7 +44,7 @@ class User < ApplicationRecord
   private
 
   def downcase_email
-    email = email.downcase
+    self.email = email.downcase
   end
 end
 ```
@@ -141,7 +141,7 @@ class User < ApplicationRecord
   private
 
   def downcase_email
-    email = email.downcase
+    self.email = email.downcase
   end
 end
 ```
