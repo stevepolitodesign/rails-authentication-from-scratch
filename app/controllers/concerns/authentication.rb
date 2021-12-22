@@ -45,7 +45,7 @@ module Authentication
   private
 
   def current_user
-    Current.user = if session[:current_user_session_token].present?
+    Current.user ||= if session[:current_user_session_token].present?
       User.find_by(session_token: session[:current_user_session_token])
     elsif cookies.permanent.encrypted[:remember_token].present?
       User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
