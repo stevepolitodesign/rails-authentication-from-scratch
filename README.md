@@ -461,7 +461,7 @@ module Authentication
   private
 
   def current_user
-    Current.user = session[:current_user_id] && User.find_by(id: session[:current_user_id])
+    Current.user ||= session[:current_user_id] && User.find_by(id: session[:current_user_id])
   end
 
   def user_signed_in?
@@ -488,7 +488,7 @@ end
 >   - We set the user's ID in the [session](https://guides.rubyonrails.org/action_controller_overview.html#session) so that we can have access to the user across requests. The user's ID won't be stored in plain text. The cookie data is cryptographically signed to make it tamper-proof. And it is also encrypted so anyone with access to it can't read its contents.
 >   - The `logout` method simply [resets the session](https://api.rubyonrails.org/classes/ActionController/Metal.html#method-i-reset_session).
 >   - The `redirect_if_authenticated` method checks to see if the user is logged in. If they are, they'll be redirected to the `root_path`. This will be useful on pages an authenticated user should not be able to access, such as the login page.
->   - The `current_user` method returns a `User` and sets it as the user on the `Current` class we created. We call the `before_action` [filter](https://guides.rubyonrails.org/action_controller_overview.html#filters) so that we have access to the current user before each request. We also add this as a [helper_method](https://api.rubyonrails.org/classes/AbstractController/Helpers/ClassMethods.html#method-i-helper_method) so that we have access to `current_user` in the views.
+>   - The `current_user` method returns a `User` and sets it as the user on the `Current` class we created. We use [memoization](https://www.honeybadger.io/blog/ruby-rails-memoization/) to avoid fetching the User each time we call the method. We call the `before_action` [filter](https://guides.rubyonrails.org/action_controller_overview.html#filters) so that we have access to the current user before each request. We also add this as a [helper_method](https://api.rubyonrails.org/classes/AbstractController/Helpers/ClassMethods.html#method-i-helper_method) so that we have access to `current_user` in the views.
 >   - The `user_signed_in?` method simply returns true or false depending on whether the user is signed in or not. This is helpful for conditionally rendering items in views.
 
 ## Step 7: Create Login Page
@@ -1127,7 +1127,7 @@ module Authentication
   private
 
   def current_user
-    Current.user = if session[:current_user_id].present?
+    Current.user ||= if session[:current_user_id].present?
       User.find_by(id: session[:current_user_id])
     elsif cookies.permanent.encrypted[:remember_token].present?
       User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
@@ -1376,7 +1376,7 @@ module Authentication
   private
 
   def current_user
-    Current.user = if session[:current_user_session_token].present?
+    Current.user ||= if session[:current_user_session_token].present?
       User.find_by(session_token: session[:current_user_session_token])
     elsif cookies.permanent.encrypted[:remember_token].present?
       User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
