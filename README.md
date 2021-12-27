@@ -129,7 +129,7 @@ class User < ApplicationRecord
     confirmed_at.present?
   end
 
-  def confirmation_token_has_not_expired?
+  def confirmation_token_is_valid?
     return false if confirmation_sent_at.nil?
     (Time.current - confirmation_sent_at) <= User::CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS
   end
@@ -152,7 +152,7 @@ end
 > - The `has_secure_token :confirmation_token` method is added to give us an [API](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) to work with the `confirmation_token` column.
 > - The `confirm!` method will be called when a user confirms their email address. We still need to build this feature.
 > - The `confirmed?` and `unconfirmed?` methods allow us to tell whether a user has confirmed their email address or not.
-> - The `confirmation_token_has_not_expired?` method tells us if the confirmation token is expired or not. This can be controlled by changing the value of the `CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS` constant. This will be useful when we build the confirmation mailer.
+> - The `confirmation_token_is_valid?` method tells us if the confirmation token is expired or not. This can be controlled by changing the value of the `CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS` constant. This will be useful when we build the confirmation mailer.
 
 ## Step 3: Create Sign Up Pages
 
@@ -263,7 +263,7 @@ class ConfirmationsController < ApplicationController
   def edit
     @user = User.find_by(confirmation_token: params[:confirmation_token])
 
-    if @user.present? && @user.confirmation_token_has_not_expired?
+    if @user.present? && @user.confirmation_token_is_valid?
       @user.confirm!
       redirect_to root_path, notice: "Your account has been confirmed."
     else
@@ -581,7 +581,7 @@ class ConfirmationsController < ApplicationController
 
   def edit
     ...
-    if @user.present? && @user.confirmation_token_has_not_expired?
+    if @user.present? && @user.confirmation_token_is_valid?
       @user.confirm!
       login @user
       ...
@@ -886,7 +886,7 @@ class ConfirmationsController < ApplicationController
   ...
   def edit
     ...
-    if @user.present? && @user.unconfirmed_or_reconfirming? && @user.confirmation_token_has_not_expired?
+    if @user.present? && @user.unconfirmed_or_reconfirming? && @user.confirmation_token_is_valid?
       if @user.confirm!
         login @user
         redirect_to root_path, notice: "Your account has been confirmed."
@@ -1047,7 +1047,7 @@ class ConfirmationsController < ApplicationController
   ...
   def edit
     ...
-    if @user.present? && @user.unconfirmed_or_reconfirming? && @user.confirmation_token_has_not_expired?
+    if @user.present? && @user.unconfirmed_or_reconfirming? && @user.confirmation_token_is_valid?
       ...
     end
   end

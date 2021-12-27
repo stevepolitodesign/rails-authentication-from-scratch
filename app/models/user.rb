@@ -55,7 +55,7 @@ class User < ApplicationRecord
     end
   end
 
-  def confirmation_token_has_not_expired?
+  def confirmation_token_is_valid?
     return false if confirmation_sent_at.nil?
     (Time.current - confirmation_sent_at) <= User::CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS
   end

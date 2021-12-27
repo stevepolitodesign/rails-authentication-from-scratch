@@ -107,14 +107,14 @@ class UserTest < ActiveSupport::TestCase
     assert_equal @user.unconfirmed_email, ActionMailer::Base.deliveries.last.to[0]
   end
 
-  test "should respond to confirmation_token_has_not_expired?" do
-    assert_not @user.confirmation_token_has_not_expired?
+  test "should respond to confirmation_token_is_valid?" do
+    assert_not @user.confirmation_token_is_valid?
 
     @user.confirmation_sent_at = 1.minute.ago
-    assert @user.confirmation_token_has_not_expired?
+    assert @user.confirmation_token_is_valid?
 
     @user.confirmation_sent_at = 601.seconds.ago
-    assert_not @user.confirmation_token_has_not_expired?
+    assert_not @user.confirmation_token_is_valid?
   end
 
   test "should respond to send_password_reset_email!" do
