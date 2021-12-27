@@ -1212,7 +1212,7 @@ module Authentication
   end
   ...
   def store_location
-    session[:user_return_to] = request.original_url if request.get?
+    session[:user_return_to] = request.original_url if request.get? && request.local?
   end
   ...
 end
@@ -1220,7 +1220,7 @@ end
 
 > **What's Going On Here?**
 >
-> - The `store_location` method stores the [request.original_url](https://api.rubyonrails.org/classes/ActionDispatch/Request.html#method-i-original_url) in the [session](https://guides.rubyonrails.org/action_controller_overview.html#session) so it can be retrieved later. We only do this if the request made was a get request.
+> - The `store_location` method stores the [request.original_url](https://api.rubyonrails.org/classes/ActionDispatch/Request.html#method-i-original_url) in the [session](https://guides.rubyonrails.org/action_controller_overview.html#session) so it can be retrieved later. We only do this if the request made was a get request. We also call `request.local?` to ensure it was a local request. This prevents redirecting to an external application.
 > - We call `store_location` in the `authenticate_user!` method so that we can save the path to the page the user was trying to visit before they were redirected to the login page. We need to do this before visiting the login page otherwise the call to `request.original_url` will always return the url to the login page.
 
 2. Update Sessions Controller.
