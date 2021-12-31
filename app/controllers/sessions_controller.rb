@@ -22,7 +22,7 @@ class SessionsController < ApplicationController
   def destroy
     forget(current_user)
     logout
-    redirect_to root_path, notice: "Singed out."
+    redirect_to root_path, notice: "Signed out."
   end
 
   def new

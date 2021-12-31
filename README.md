@@ -524,7 +524,7 @@ class SessionsController < ApplicationController
 
   def destroy
     logout
-    redirect_to root_path, notice: "Singed out."
+    redirect_to root_path, notice: "Signed out."
   end
 
   def new
@@ -1326,7 +1326,7 @@ You can read more about session replay attacks [here](https://binarysolo.chapter
 1. Add a session_token column to users table.
 
 ```bash
-rails g migration add add_session_token_to_users session_token:string
+rails g migration add_session_token_to_users session_token:string
 ```
 
 2. Update migration.
