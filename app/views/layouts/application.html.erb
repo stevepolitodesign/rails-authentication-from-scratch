@@ -15,11 +15,18 @@
       <% flash.each do |message_type, message| %>
         <div class="<%= message_type %>"><%= message %></div>
       <% end %>
-      <% if user_signed_in? %>
-        <%= button_to "Logout", logout_path, method: :delete %>
-      <% else %>
-        <%= link_to "Login", login_path %>
-      <% end %>
+      <ul>
+        <% if user_signed_in? %>
+          <li><%= link_to "My Acount", account_path %></li>
+           <li><%= button_to "Logout", logout_path, method: :delete %></li>
+        <% else %>
+           <li><%= link_to "Login", login_path %></li>
+           <li><%= link_to "Sign Up", sign_up_path %></li>
+           <li><%= link_to "Forgot my password", new_password_path %></li>
+           <li><%= link_to "Didn't receive confirmation instructions", new_confirmation_path %></li>
+        <% end %>
+      </ul>
+      <hr/>
     <header>
     <main style="width: 1200px; margin: 0 auto;"> 
       <%= yield %>

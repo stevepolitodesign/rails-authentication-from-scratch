@@ -223,7 +223,7 @@ end
     <%= form.label :password_confirmation %>
     <%= form.password_field :password_confirmation, required: true %>
   </div>
-  <%= form.submit %>
+  <%= form.submit "Sign Up" %>
 <% end %>
 ```
 
@@ -1041,7 +1041,7 @@ end
     <%= form.label :current_password, "Current password (we need your current password to confirm your changes)" %>
     <%= form.password_field :current_password, required: true %>
   </div>
-  <%= form.submit %>
+  <%= form.submit "Update Account" %>
 <% end %>
 ```
 
@@ -1208,7 +1208,7 @@ end
     <%= form.label :remember_me %>
     <%= form.check_box :remember_me %>
   </div>
-  <%= form.submit %>
+  <%= form.submit "Sign In" %>
 <% end %>
 ```
 
