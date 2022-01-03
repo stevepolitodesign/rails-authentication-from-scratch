@@ -1333,9 +1333,11 @@ end
 
 ## Step 18: Account for Session Replay Attacks
 
-We're currently setting the user's ID in the session. Even though that value is encrypted, the encrypted value doesn't change since it's based on the user id which doesn't change. This means that if a bad actor were to get a copy of the session they would have access to a victim's account in perpetuity. One solution is to [rotate encrypted and signed cookie configurations](https://guides.rubyonrails.org/security.html#rotating-encrypted-and-signed-cookies-configurations). Another is to use a rotating value to identify the user. 
+**Note that this refactor prevents a user from being logged into multiple devices and browsers at one time.**
 
-You can read more about session replay attacks [here](https://binarysolo.chapter24.blog/avoiding-session-replay-attacks-in-rails/)
+We're currently setting the user's ID in the session. Even though that value is encrypted, the encrypted value doesn't change since it's based on the user id which doesn't change. This means that if a bad actor were to get a copy of the session they would have access to a victim's account in perpetuity. One solution is to [rotate encrypted and signed cookie configurations](https://guides.rubyonrails.org/security.html#rotating-encrypted-and-signed-cookies-configurations). Another solution is to use a rotating value to identify the user (which is what we'll be doing). A third option is to configure the [Rails session store](https://guides.rubyonrails.org/configuring.html#config-session-store) to use `mem_cache_store` to store session data.
+
+You can read more about session replay attacks [here](https://binarysolo.chapter24.blog/avoiding-session-replay-attacks-in-rails/).
 
 1. Add a session_token column to the users table.
 
