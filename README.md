@@ -2,7 +2,15 @@
 
 If you're like me then you probably take Devise for granted because you're too intimidated to roll your own authentication system. As powerful as Devise is, it's not perfect. There are plenty of cases where I've reached for it only to end up constrained by its features and design, and wished I could customize it exactly to my liking.
 
-Fortunately, Rails gives you all the tools you need to roll your own authentication system from scratch without needing to depend on a gem. That challenge is just knowing how to account for edge cases while being cognizant of security and best practices.
+Fortunately, Rails gives you all the tools you need to roll your own authentication system from scratch without needing to depend on a gem. The challenge is just knowing how to account for edge cases while being cognizant of security and best practices.
+
+## Local Development
+
+Simply run the setup script and follow the prompts to see the final application.
+
+```bash
+./bin/setup
+```
 
 ## Step 1: Build User Model
 
