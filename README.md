@@ -519,7 +519,7 @@ class SessionsController < ApplicationController
     @user = User.find_by(email: params[:user][:email].downcase)
     if @user
       if @user.unconfirmed?
-        redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
+        redirect_to new_confirmation_path, alert: "Incorrect email or password."
       elsif @user.authenticate(params[:user][:password])
         login @user
         redirect_to root_path, notice: "Signed in."
@@ -578,6 +578,7 @@ end
 > - The `create` method simply checks if the user exists and is confirmed. If they are, then we check their password. If the password is correct, we log them in via the `login` method we created in the `Authentication` Concern. Otherwise, we render an alert.
 >   - We're able to call `user.authenticate` because of [has_secure_password](https://api.rubyonrails.org/classes/ActiveModel/SecurePassword/ClassMethods.html#method-i-has_secure_password)
 >   - Note that we call `downcase` on the email to account for case sensitivity when searching.
+>   - Note that we set the flash to "Incorrect email or password." if the user is unconfirmed. This prevents leaking email addresses.
 > - The `destroy` method simply calls the `logout` method we created in the `Authentication` Concern.
 > - The login form is passed a `scope: :user` option so that the params are namespaced as `params[:user][:some_value]`. This is not required, but it helps keep things organized.
 
@@ -1324,7 +1325,7 @@ class SessionsController < ApplicationController
     @user = User.authenticate_by(email: params[:user][:email].downcase, password: params[:user][:password])
     if @user
       if @user.unconfirmed?
-        redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
+        redirect_to new_confirmation_path, alert: "Incorrect email or password."
       else
         after_login_path = session[:user_return_to] || root_path
         login @user
