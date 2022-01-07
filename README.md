@@ -71,7 +71,7 @@ end
 1. Create migration.
 
 ```bash
-rails g migration add_confirmation_and_password_columns_to_users confirmation_token:string confirmation_sent_at:datetime confirmed_at:datetime password_digest:string
+rails g migration add_confirmation_and_password_columns_to_users confirmed_at:datetime password_digest:string
 ```
 
 2. Update the migration.
@@ -80,20 +80,14 @@ rails g migration add_confirmation_and_password_columns_to_users confirmation_to
 # db/migrate/[timestamp]_add_confirmation_and_password_columns_to_users.rb
 class AddConfirmationAndPasswordColumnsToUsers < ActiveRecord::Migration[6.1]
   def change
-    add_column :users, :confirmation_token, :string, null: false
-    add_column :users, :confirmation_sent_at, :datetime
     add_column :users, :confirmed_at, :datetime
     add_column :users, :password_digest, :string, null: false
-
-    add_index :users, :confirmation_token, unique: true
   end
 end
 ```
 
 > **What's Going On Here?**
 >
-> - The `confirmation_token` column will store a random value created through the [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) method when a record is saved. This will be used to identify users in a secure way when we need to confirm their email address. We add `null: false` to prevent empty values and also add a unique index to ensure that no two users will have the same `confirmation_token`. You can think of this as a secure alternative to the `id` column.
-> - The `confirmation_sent_at` column will be used to ensure a confirmation has not expired. This is an added layer of security to prevent a `confirmation_token` from being used multiple times.
 > - The `confirmed_at` column will be set when a user confirms their account. This will help us determine who has confirmed their account and who has not.
 > - The `password_digest` column will store a hashed version of the user's password. This is provided by the [has_secure_password](https://api.rubyonrails.org/classes/ActiveModel/SecurePassword/ClassMethods.html#method-i-has_secure_password) method.
 
@@ -121,17 +115,15 @@ bundle install
 ```ruby
 # app/models/user.rb
 class User < ApplicationRecord
-  CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS = 10.minutes.to_i
+  CONFIRMATION_TOKEN_EXPIRATION = 10.minutes
 
   has_secure_password
-  has_secure_token :confirmation_token
 
   before_save :downcase_email
 
   validates :email, format: {with: URI::MailTo::EMAIL_REGEXP}, presence: true, uniqueness: true
 
   def confirm!
-    regenerate_confirmation_token
     update_columns(confirmed_at: Time.current)
   end
 
@@ -139,9 +131,8 @@ class User < ApplicationRecord
     confirmed_at.present?
   end
 
-  def confirmation_token_is_valid?
-    return false if confirmation_sent_at.nil?
-    (Time.current - confirmation_sent_at) <= User::CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS
+  def generate_confirmation_token
+    signed_id expires_in: CONFIRMATION_TOKEN_EXPIRATION, purpose: :confirm_email
   end
 
   def unconfirmed?
@@ -159,11 +150,9 @@ end
 > **What's Going On Here?**
 >
 > - The `has_secure_password` method is added to give us an [API](https://api.rubyonrails.org/classes/ActiveModel/SecurePassword/ClassMethods.html#method-i-has_secure_password) to work with the `password_digest` column.
-> - The `has_secure_token :confirmation_token` method is added to give us an [API](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) to work with the `confirmation_token` column.
 > - The `confirm!` method will be called when a user confirms their email address. We still need to build this feature.
->   - Note that we call `regenerate_confirmation_token` to ensure their `confirmation_token` is reset so that it cannot be used again.
 > - The `confirmed?` and `unconfirmed?` methods allow us to tell whether a user has confirmed their email address or not.
-> - The `confirmation_token_is_valid?` method tells us if the confirmation token is expired or not. This can be controlled by changing the value of the `CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS` constant. This will be useful when we build the confirmation mailer.
+> - The `generate_confirmation_token` method creates a [signed_id](https://api.rubyonrails.org/classes/ActiveRecord/SignedId.html#method-i-signed_id) that will be used to securely identify the user. For added security, we ensure that this ID will expire in 10 minutes (this can be controlled with the `CONFIRMATION_TOKEN_EXPIRATION` constant) and give it an explicit purpose of `:confirm_email`. This will be useful when we build the confirmation mailer.
 
 ## Step 3: Create Sign Up Pages
 
@@ -272,9 +261,9 @@ class ConfirmationsController < ApplicationController
   end
 
   def edit
-    @user = User.find_by(confirmation_token: params[:confirmation_token])
+    @user = User.find_signed(params[:confirmation_token], purpose: :confirm_email)
 
-    if @user.present? && @user.confirmation_token_is_valid?
+    if @user.present?
       @user.confirm!
       redirect_to root_path, notice: "Your account has been confirmed."
     else
@@ -314,7 +303,8 @@ end
 > **What's Going On Here?**
 >
 > - The `create` action will be used to resend confirmation instructions to an unconfirmed user. We still need to build this mailer, and we still need to send this mailer when a user initially signs up. This action will be requested via the form on `app/views/confirmations/new.html.erb`. Note that we call `downcase` on the email to account for case sensitivity when searching.
-> - The `edit` action is used to confirm a user's email. This will be the page that a user lands on when they click the confirmation link in their email. We still need to build this. Note that we're looking up a user through their `confirmation_token` and not their email or ID. This is because The `confirmation_token` is randomly generated and can't be easily guessed unlike an email or numeric ID. This is also why we added `param: :confirmation_token` as a [named route parameter](https://guides.rubyonrails.org/routing.html#overriding-named-route-parameters). Note that we check if their confirmation token has expired before confirming their account.
+> - The `edit` action is used to confirm a user's email. This will be the page that a user lands on when they click the confirmation link in their email. We still need to build this. Note that we're looking up a user through the [find_signed](https://api.rubyonrails.org/classes/ActiveRecord/SignedId/ClassMethods.html#method-i-find_signed) method and not their email or ID. This is because The `confirmation_token` is randomly generated and can't be guessed or tampered with unlike an email or numeric ID. This is also why we added `param: :confirmation_token` as a [named route parameter](https://guides.rubyonrails.org/routing.html#overriding-named-route-parameters).
+>  - You'll remember that the `confirmation_token` is a [signed_id](https://api.rubyonrails.org/classes/ActiveRecord/SignedId.html#method-i-signed_id), and is set to expire in 10 minutes. You'll also note that we need to pass the method `purpose: :confirm_email` to be consistent with the purpose that was set in the `generate_confirmation_token` method. 
 
 ## Step 5: Create Confirmation Mailer
 
@@ -331,8 +321,9 @@ rails g mailer User confirmation
 class UserMailer < ApplicationMailer
   default from: User::MAILER_FROM_EMAIL
 
-  def confirmation(user)
+  def confirmation(user, confirmation_token)
     @user = user
+    @confirmation_token = confirmation_token
 
     mail to: @user.email, subject: "Confirmation Instructions"
   end
@@ -343,14 +334,14 @@ end
 <!-- app/views/user_mailer/confirmation.html.erb -->
 <h1>Confirmation Instructions</h1>
 
-<%= link_to "Click here to confirm your email.", edit_confirmation_url(@user.confirmation_token) %>
+<%= link_to "Click here to confirm your email.", edit_confirmation_url(@confirmation_token) %>
 ```
 
 ```html+erb
 <!-- app/views/user_mailer/confirmation.text.erb -->
 Confirmation Instructions
 
-<%= edit_confirmation_url(@user.confirmation_token) %>
+<%= edit_confirmation_url(@confirmation_token) %>
 ```
 
 2. Update User Model.
@@ -362,9 +353,8 @@ class User < ApplicationRecord
   MAILER_FROM_EMAIL = "no-reply@example.com"
   ...
   def send_confirmation_email!
-    regenerate_confirmation_token
-    update_columns(confirmation_sent_at: Time.current)
-    UserMailer.confirmation(self).deliver_now
+    confirmation_token = generate_confirmation_token
+    UserMailer.confirmation(self, confirmation_token).deliver_now
   end
 
 end
@@ -373,7 +363,7 @@ end
 > **What's Going On Here?**
 >
 > - The `MAILER_FROM_EMAIL` constant is a way for us to set the email used in the `UserMailer`. This is optional.
-> - The `send_confirmation_email!` method will create a new `confirmation_token` and update the value of `confirmation_sent_at`. This is to ensure confirmation links expire and cannot be reused. It will also send the confirmation email to the user.
+> - The `send_confirmation_email!` method will create a new `confirmation_token`. This is to ensure confirmation links expire and cannot be reused. It will also send the confirmation email to the user.
 > - We call [update_columns](https://api.rubyonrails.org/classes/ActiveRecord/Persistence.html#method-i-update_columns) so that the `updated_at/updated_on` columns are not updated. This is personal preference, but those columns should typically only be updated when the user updates their email or password.
 > - The links in the mailer will take the user to `ConfirmationsController#edit` at which point they'll be confirmed.
 
@@ -593,7 +583,7 @@ class ConfirmationsController < ApplicationController
 
   def edit
     ...
-    if @user.present? && @user.confirmation_token_is_valid?
+    if @user.present?
       @user.confirm!
       login @user
       ...
@@ -850,7 +840,6 @@ class User < ApplicationRecord
       if unconfirmed_email.present?
         return false unless update(email: unconfirmed_email, unconfirmed_email: nil)
       end
-      regenerate_confirmation_token
       update_columns(confirmed_at: Time.current)
     else
       false
@@ -914,7 +903,7 @@ class ConfirmationsController < ApplicationController
   ...
   def edit
     ...
-    if @user.present? && @user.confirmation_token_is_valid?
+    if @user.present?
       if @user.confirm!
         login @user
         redirect_to root_path, notice: "Your account has been confirmed."
@@ -1075,7 +1064,7 @@ class ConfirmationsController < ApplicationController
   ...
   def edit
     ...
-    if @user.present? && @user.unconfirmed_or_reconfirming? && @user.confirmation_token_is_valid?
+    if @user.present? && @user.unconfirmed_or_reconfirming?
       ...
     end
   end
