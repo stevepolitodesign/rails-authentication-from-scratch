@@ -748,6 +748,7 @@ class PasswordsController < ApplicationController
       elsif @user.password_reset_token_has_expired?
         redirect_to new_password_path, alert: "Incorrect email or password."
       elsif @user.update(password_params)
+        @user.regenerate_password_reset_token
         redirect_to login_path, notice: "Signed in."
       else
         flash.now[:alert] = @user.errors.full_messages.to_sentence
@@ -775,6 +776,7 @@ end
 > - The `new` action simply renders a form for the user to put their email address in to receive the password reset email.
 > - The `update` also ensures the user is identified by their `password_reset_token`. It's not enough to just do this on the `edit` action since a bad actor could make a `PUT` request to the server and bypass the form.
 >   - If the user exists and is confirmed and their password token has not expired, we update their password to the one they will set in the form. Otherwise, we handle each failure case differently.
+>   - Note that we call `@user.regenerate_password_reset_token` to ensure their `password_reset_token` is reset so that it cannot be used again.
 
 2. Update Routes.
 

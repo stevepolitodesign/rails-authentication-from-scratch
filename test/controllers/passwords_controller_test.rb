@@ -73,12 +73,14 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
   test "should update password" do
     @confirmed_user.send_password_reset_email!
 
-    put password_path(@confirmed_user.password_reset_token), params: {
-      user: {
-        password: "password",
-        password_confirmation: "password"
+    assert_changes "@confirmed_user.reload.password_reset_token" do
+      put password_path(@confirmed_user.password_reset_token), params: {
+        user: {
+          password: "password",
+          password_confirmation: "password"
+        }
       }
-    }
+    end
 
     assert_redirected_to login_path
     assert_not_nil flash[:notice]
