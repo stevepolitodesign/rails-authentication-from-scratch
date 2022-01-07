@@ -35,6 +35,7 @@ class PasswordsController < ApplicationController
       elsif @user.password_reset_token_has_expired?
         redirect_to new_password_path, alert: "Incorrect email or password."
       elsif @user.update(password_params)
+        @user.regenerate_password_reset_token
         redirect_to login_path, notice: "Password updated."
       else
         flash.now[:alert] = @user.errors.full_messages.to_sentence
