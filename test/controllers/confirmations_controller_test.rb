@@ -2,38 +2,39 @@ require "test_helper"
 
 class ConfirmationsControllerTest < ActionDispatch::IntegrationTest
   setup do
-    @reconfirmed_user = User.create!(email: "reconfirmed_user@example.com", password: "password", password_confirmation: "password", confirmed_at: 1.week.ago, confirmation_sent_at: 1.week.ago, unconfirmed_email: "unconfirmed_email@example.com")
-    @confirmed_user = User.create!(email: "confirmed_user@example.com", password: "password", password_confirmation: "password", confirmed_at: 1.week.ago, confirmation_sent_at: 1.week.ago)
-    @unconfirmed_user = User.create!(email: "unconfirmed_user@example.com", confirmation_sent_at: Time.current, password: "password", password_confirmation: "password")
+    @reconfirmed_user = User.create!(email: "reconfirmed_user@example.com", password: "password", password_confirmation: "password", confirmed_at: 1.week.ago, unconfirmed_email: "unconfirmed_email@example.com")
+    @confirmed_user = User.create!(email: "confirmed_user@example.com", password: "password", password_confirmation: "password", confirmed_at: 1.week.ago)
+    @unconfirmed_user = User.create!(email: "unconfirmed_user@example.com", password: "password", password_confirmation: "password")
   end
 
   test "should confirm unconfirmed user" do
-    freeze_time
+    freeze_time do
+      confirmation_token = @unconfirmed_user.generate_confirmation_token
 
-    assert_changes "@unconfirmed_user.reload.confirmation_token" do
-      get edit_confirmation_path(@unconfirmed_user.confirmation_token)
+      get edit_confirmation_path(confirmation_token)
+
+      assert @unconfirmed_user.reload.confirmed?
+      assert_equal Time.now, @unconfirmed_user.confirmed_at
+      assert_redirected_to root_path
+      assert_not_nil flash[:notice]
     end
-
-    assert_equal Time.current, @unconfirmed_user.reload.confirmed_at
-    assert @unconfirmed_user.reload.confirmed?
-    assert_redirected_to root_path
-    assert_not_nil flash[:notice]
   end
 
   test "should reconfirm confirmed user" do
     unconfirmed_email = @reconfirmed_user.unconfirmed_email
-    freeze_time
 
-    @reconfirmed_user.send_confirmation_email!
+    freeze_time do
+      confirmation_token = @reconfirmed_user.generate_confirmation_token
 
-    get edit_confirmation_path(@reconfirmed_user.confirmation_token)
+      get edit_confirmation_path(confirmation_token)
 
-    assert_equal Time.current, @reconfirmed_user.reload.confirmed_at
-    assert @reconfirmed_user.reload.confirmed?
-    assert_equal unconfirmed_email, @reconfirmed_user.reload.email
-    assert_nil @reconfirmed_user.reload.unconfirmed_email
-    assert_redirected_to root_path
-    assert_not_nil flash[:notice]
+      assert @reconfirmed_user.reload.confirmed?
+      assert_equal Time.current, @reconfirmed_user.reload.confirmed_at
+      assert_equal unconfirmed_email, @reconfirmed_user.reload.email
+      assert_nil @reconfirmed_user.reload.unconfirmed_email
+      assert_redirected_to root_path
+      assert_not_nil flash[:notice]
+    end
   end
 
   test "should not update email address if already taken" do
@@ -41,9 +42,9 @@ class ConfirmationsControllerTest < ActionDispatch::IntegrationTest
     @reconfirmed_user.update(unconfirmed_email: @confirmed_user.email)
 
     freeze_time do
-      @reconfirmed_user.send_confirmation_email!
+      confirmation_token = @reconfirmed_user.generate_confirmation_token
 
-      get edit_confirmation_path(@reconfirmed_user.confirmation_token)
+      get edit_confirmation_path(confirmation_token)
 
       assert_equal original_email, @reconfirmed_user.reload.email
       assert_redirected_to new_confirmation_path
@@ -52,14 +53,16 @@ class ConfirmationsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should redirect if confirmation link expired" do
-    travel_to 601.seconds.from_now
+    confirmation_token = @unconfirmed_user.generate_confirmation_token
 
-    get edit_confirmation_path(@unconfirmed_user.confirmation_token)
+    travel_to 601.seconds.from_now do
+      get edit_confirmation_path(confirmation_token)
 
-    assert_nil @unconfirmed_user.reload.confirmed_at
-    assert_not @unconfirmed_user.reload.confirmed?
-    assert_redirected_to new_confirmation_path
-    assert_not_nil flash[:alert]
+      assert_nil @unconfirmed_user.reload.confirmed_at
+      assert_not @unconfirmed_user.reload.confirmed?
+      assert_redirected_to new_confirmation_path
+      assert_not_nil flash[:alert]
+    end
   end
 
   test "should redirect if confirmation link is incorrect" do
@@ -91,34 +94,36 @@ class ConfirmationsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should prevent authenticated user from confirming" do
-    freeze_time
+    freeze_time do
+      confirmation_token = @confirmed_user.generate_confirmation_token
 
-    @reconfirmed_user.send_confirmation_email!
-    login @confirmed_user
+      login @confirmed_user
 
-    get edit_confirmation_path(@confirmed_user.confirmation_token)
+      get edit_confirmation_path(confirmation_token)
 
-    assert_not_equal Time.current, @confirmed_user.reload.confirmed_at
-    assert_redirected_to new_confirmation_path
-    assert_not_nil flash[:alert]
+      assert_not_equal Time.current, @confirmed_user.reload.confirmed_at
+      assert_redirected_to new_confirmation_path
+      assert_not_nil flash[:alert]
+    end
   end
 
   test "should not prevent authenticated user confirming their unconfirmed_email" do
     unconfirmed_email = @reconfirmed_user.unconfirmed_email
-    freeze_time
 
-    login(@reconfirmed_user)
+    freeze_time do
+      login @reconfirmed_user
 
-    @reconfirmed_user.send_confirmation_email!
+      confirmation_token = @reconfirmed_user.generate_confirmation_token
 
-    get edit_confirmation_path(@reconfirmed_user.confirmation_token)
+      get edit_confirmation_path(confirmation_token)
 
-    assert_equal Time.current, @reconfirmed_user.reload.confirmed_at
-    assert @reconfirmed_user.reload.confirmed?
-    assert_equal unconfirmed_email, @reconfirmed_user.reload.email
-    assert_nil @reconfirmed_user.reload.unconfirmed_email
-    assert_redirected_to root_path
-    assert_not_nil flash[:notice]
+      assert_equal Time.current, @reconfirmed_user.reload.confirmed_at
+      assert @reconfirmed_user.reload.confirmed?
+      assert_equal unconfirmed_email, @reconfirmed_user.reload.email
+      assert_nil @reconfirmed_user.reload.unconfirmed_email
+      assert_redirected_to root_path
+      assert_not_nil flash[:notice]
+    end
   end
 
   test "should prevent authenticated user from submitting the confirmation form" do

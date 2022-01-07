@@ -6,11 +6,12 @@ class UserMailerTest < ActionMailer::TestCase
   end
 
   test "confirmation" do
-    mail = UserMailer.confirmation(@user)
+    confirmation_token = @user.generate_confirmation_token
+    mail = UserMailer.confirmation(@user, confirmation_token)
     assert_equal "Confirmation Instructions", mail.subject
     assert_equal [@user.email], mail.to
     assert_equal [User::MAILER_FROM_EMAIL], mail.from
-    assert_match @user.confirmation_token, mail.body.encoded
+    assert_match confirmation_token, mail.body.encoded
   end
 
   test "password_reset" do

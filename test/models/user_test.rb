@@ -74,47 +74,25 @@ class UserTest < ActiveSupport::TestCase
     assert @user.unconfirmed_or_reconfirming?
   end
 
-  test "should confirm email" do
+  test "should send confirmation email" do
     @user.save!
-    original_confirmation_token = @user.confirmation_token
-
-    freeze_time
-
-    assert_nil @user.confirmation_sent_at
 
     assert_emails 1 do
       @user.send_confirmation_email!
     end
 
-    assert_not_equal original_confirmation_token, @user.reload.confirmation_token
-    assert_equal Time.now, @user.confirmation_sent_at
     assert_equal @user.email, ActionMailer::Base.deliveries.last.to[0]
   end
 
-  test "should confirm unconfirmed_email" do
+  test "should send confirmation email to unconfirmed_email" do
     @user.save!
     @user.update!(unconfirmed_email: "unconfirmed_email@example.com")
-    previous_confirmation_token = @user.reload.confirmation_token
-
-    freeze_time
 
     assert_emails 1 do
       @user.send_confirmation_email!
     end
 
-    assert_not_equal previous_confirmation_token, @user.reload.confirmation_token
-    assert_equal Time.now, @user.confirmation_sent_at
     assert_equal @user.unconfirmed_email, ActionMailer::Base.deliveries.last.to[0]
-  end
-
-  test "should respond to confirmation_token_is_valid?" do
-    assert_not @user.confirmation_token_is_valid?
-
-    @user.confirmation_sent_at = 1.minute.ago
-    assert @user.confirmation_token_is_valid?
-
-    @user.confirmation_sent_at = 601.seconds.ago
-    assert_not @user.confirmation_token_is_valid?
   end
 
   test "should respond to send_password_reset_email!" do
