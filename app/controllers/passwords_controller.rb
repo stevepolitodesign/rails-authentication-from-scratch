@@ -39,11 +39,11 @@ class PasswordsController < ApplicationController
         redirect_to login_path, notice: "Password updated."
       else
         flash.now[:alert] = @user.errors.full_messages.to_sentence
-        render :edit
+        render :edit, status: :unprocessable_entity
       end
     else
       flash.now[:alert] = "Incorrect email or password."
-      render :new
+      render :new, status: :unprocessable_entity
     end
   end
 
