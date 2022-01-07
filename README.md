@@ -188,7 +188,7 @@ class UsersController < ApplicationController
     if @user.save
       redirect_to root_path, notice: "Please check your email for confirmation instructions."
     else
-      render :new
+      render :new, status: :unprocessable_entity
     end
   end
 
@@ -525,11 +525,11 @@ class SessionsController < ApplicationController
         redirect_to root_path, notice: "Signed in."
       else
         flash.now[:alert] = "Incorrect email or password."
-        render :new        
+        render :new, status: :unprocessable_entity
       end
     else
       flash.now[:alert] = "Incorrect email or password."
-      render :new
+      render :new, status: :unprocessable_entity
     end
   end
 
@@ -755,11 +755,11 @@ class PasswordsController < ApplicationController
         redirect_to login_path, notice: "Signed in."
       else
         flash.now[:alert] = @user.errors.full_messages.to_sentence
-        render :edit        
+        render :edit, status: :unprocessable_entity
       end
     else
       flash.now[:alert] = "Incorrect email or password."
-      render :new
+      render :new, status: :unprocessable_entity
     end
   end
 
@@ -1334,7 +1334,7 @@ class SessionsController < ApplicationController
       end
     else
       flash.now[:alert] = "Incorrect email or password."
-      render :new
+      render :new, status: :unprocessable_entity
     end
   end
   ...
