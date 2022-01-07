@@ -131,6 +131,7 @@ class User < ApplicationRecord
   validates :email, format: {with: URI::MailTo::EMAIL_REGEXP}, presence: true, uniqueness: true
 
   def confirm!
+    regenerate_confirmation_token
     update_columns(confirmed_at: Time.current)
   end
 
@@ -160,6 +161,7 @@ end
 > - The `has_secure_password` method is added to give us an [API](https://api.rubyonrails.org/classes/ActiveModel/SecurePassword/ClassMethods.html#method-i-has_secure_password) to work with the `password_digest` column.
 > - The `has_secure_token :confirmation_token` method is added to give us an [API](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) to work with the `confirmation_token` column.
 > - The `confirm!` method will be called when a user confirms their email address. We still need to build this feature.
+>   - Note that we call `regenerate_confirmation_token` to ensure their `confirmation_token` is reset so that it cannot be used again.
 > - The `confirmed?` and `unconfirmed?` methods allow us to tell whether a user has confirmed their email address or not.
 > - The `confirmation_token_is_valid?` method tells us if the confirmation token is expired or not. This can be controlled by changing the value of the `CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS` constant. This will be useful when we build the confirmation mailer.
 
@@ -847,6 +849,7 @@ class User < ApplicationRecord
       if unconfirmed_email.present?
         return false unless update(email: unconfirmed_email, unconfirmed_email: nil)
       end
+      regenerate_confirmation_token
       update_columns(confirmed_at: Time.current)
     else
       false
