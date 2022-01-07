@@ -37,6 +37,7 @@ class User < ApplicationRecord
       if unconfirmed_email.present?
         return false unless update(email: unconfirmed_email, unconfirmed_email: nil)
       end
+      regenerate_confirmation_token
       update_columns(confirmed_at: Time.current)
     else
       false

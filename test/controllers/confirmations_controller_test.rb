@@ -10,7 +10,9 @@ class ConfirmationsControllerTest < ActionDispatch::IntegrationTest
   test "should confirm unconfirmed user" do
     freeze_time
 
-    get edit_confirmation_path(@unconfirmed_user.confirmation_token)
+    assert_changes "@unconfirmed_user.reload.confirmation_token" do
+      get edit_confirmation_path(@unconfirmed_user.confirmation_token)
+    end
 
     assert_equal Time.current, @unconfirmed_user.reload.confirmed_at
     assert @unconfirmed_user.reload.confirmed?
