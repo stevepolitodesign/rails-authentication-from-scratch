@@ -1,12 +1,11 @@
 class User < ApplicationRecord
-  CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS = 10.minutes.to_i
+  CONFIRMATION_TOKEN_EXPIRATION = 10.minutes
   MAILER_FROM_EMAIL = "no-reply@example.com"
   PASSWORD_RESET_TOKEN_EXPIRATION_IN_SECONDS = 10.minutes.to_i
 
   attr_accessor :current_password
 
   has_secure_password
-  has_secure_token :confirmation_token
   has_secure_token :password_reset_token
   has_secure_token :remember_token
   has_secure_token :session_token
@@ -37,7 +36,6 @@ class User < ApplicationRecord
       if unconfirmed_email.present?
         return false unless update(email: unconfirmed_email, unconfirmed_email: nil)
       end
-      regenerate_confirmation_token
       update_columns(confirmed_at: Time.current)
     else
       false
@@ -56,9 +54,8 @@ class User < ApplicationRecord
     end
   end
 
-  def confirmation_token_is_valid?
-    return false if confirmation_sent_at.nil?
-    (Time.current - confirmation_sent_at) <= User::CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS
+  def generate_confirmation_token
+    signed_id expires_in: CONFIRMATION_TOKEN_EXPIRATION, purpose: :confirm_email
   end
 
   def password_reset_token_has_expired?
@@ -67,9 +64,8 @@ class User < ApplicationRecord
   end
 
   def send_confirmation_email!
-    regenerate_confirmation_token
-    update_columns(confirmation_sent_at: Time.current)
-    UserMailer.confirmation(self).deliver_now
+    confirmation_token = generate_confirmation_token
+    UserMailer.confirmation(self, confirmation_token).deliver_now
   end
 
   def send_password_reset_email!

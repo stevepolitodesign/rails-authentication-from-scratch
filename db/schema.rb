@@ -16,8 +16,6 @@ ActiveRecord::Schema.define(version: 2021_12_17_184706) do
     t.string "email", null: false
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
-    t.string "confirmation_token", null: false
-    t.datetime "confirmation_sent_at"
     t.datetime "confirmed_at"
     t.string "password_digest", null: false
     t.string "password_reset_token", null: false
@@ -25,7 +23,6 @@ ActiveRecord::Schema.define(version: 2021_12_17_184706) do
     t.string "unconfirmed_email"
     t.string "remember_token", null: false
     t.string "session_token", null: false
-    t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["password_reset_token"], name: "index_users_on_password_reset_token", unique: true
     t.index ["remember_token"], name: "index_users_on_remember_token", unique: true
