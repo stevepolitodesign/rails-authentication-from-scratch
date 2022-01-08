@@ -16,10 +16,10 @@ class PasswordsController < ApplicationController
   end
 
   def edit
-    @user = User.find_by(password_reset_token: params[:password_reset_token])
+    @user = User.find_signed(params[:password_reset_token], purpose: :reset_password)
     if @user.present? && @user.unconfirmed?
       redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
-    elsif @user.nil? || @user.password_reset_token_has_expired?
+    elsif @user.nil?
       redirect_to new_password_path, alert: "Invalid or expired token."
     end
   end
@@ -28,21 +28,18 @@ class PasswordsController < ApplicationController
   end
 
   def update
-    @user = User.find_by(password_reset_token: params[:password_reset_token])
+    @user = User.find_signed(params[:password_reset_token], purpose: :reset_password)
     if @user
       if @user.unconfirmed?
         redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
-      elsif @user.password_reset_token_has_expired?
-        redirect_to new_password_path, alert: "Incorrect email or password."
       elsif @user.update(password_params)
-        @user.regenerate_password_reset_token
-        redirect_to login_path, notice: "Password updated."
+        redirect_to login_path, notice: "Sign in."
       else
         flash.now[:alert] = @user.errors.full_messages.to_sentence
         render :edit, status: :unprocessable_entity
       end
     else
-      flash.now[:alert] = "Incorrect email or password."
+      flash.now[:alert] = "Invalid or expired token."
       render :new, status: :unprocessable_entity
     end
   end

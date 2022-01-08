@@ -18,13 +18,10 @@ ActiveRecord::Schema.define(version: 2021_12_17_184706) do
     t.datetime "updated_at", precision: 6, null: false
     t.datetime "confirmed_at"
     t.string "password_digest", null: false
-    t.string "password_reset_token", null: false
-    t.datetime "password_reset_sent_at"
     t.string "unconfirmed_email"
     t.string "remember_token", null: false
     t.string "session_token", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
-    t.index ["password_reset_token"], name: "index_users_on_password_reset_token", unique: true
     t.index ["remember_token"], name: "index_users_on_remember_token", unique: true
     t.index ["session_token"], name: "index_users_on_session_token", unique: true
   end

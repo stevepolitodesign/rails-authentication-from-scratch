@@ -6,24 +6,23 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should get edit" do
-    @confirmed_user.send_password_reset_email!
+    password_reset_token = @confirmed_user.generate_password_reset_token
 
-    get edit_password_path(@confirmed_user.password_reset_token)
+    get edit_password_path(password_reset_token)
     assert_response :ok
   end
 
   test "should redirect from edit if password link expired" do
-    @confirmed_user.send_password_reset_email!
+    password_reset_token = @confirmed_user.generate_password_reset_token
 
     travel_to 601.seconds.from_now
-    get edit_password_path(@confirmed_user.password_reset_token)
+    get edit_password_path(password_reset_token)
 
     assert_redirected_to new_password_path
     assert_not_nil flash[:alert]
   end
 
   test "should redirect from edit if password link is incorrect" do
-    travel_to 601.seconds.from_now
     get edit_password_path("not_a_real_token")
 
     assert_redirected_to new_password_path
@@ -32,16 +31,20 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
 
   test "should redirect from edit if user is not confirmed" do
     @confirmed_user.update!(confirmed_at: nil)
-    get edit_password_path(@confirmed_user.password_reset_token)
+    password_reset_token = @confirmed_user.generate_password_reset_token
+
+    get edit_password_path(password_reset_token)
 
     assert_redirected_to new_confirmation_path
     assert_not_nil flash[:alert]
   end
 
   test "should redirect from edit if user is authenticated" do
+    password_reset_token = @confirmed_user.generate_password_reset_token
+
     login @confirmed_user
 
-    get edit_password_path(@confirmed_user.password_reset_token)
+    get edit_password_path(password_reset_token)
     assert_redirected_to root_path
   end
 
@@ -71,25 +74,23 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should update password" do
-    @confirmed_user.send_password_reset_email!
+    password_reset_token = @confirmed_user.generate_password_reset_token
 
-    assert_changes "@confirmed_user.reload.password_reset_token" do
-      put password_path(@confirmed_user.password_reset_token), params: {
-        user: {
-          password: "password",
-          password_confirmation: "password"
-        }
+    put password_path(password_reset_token), params: {
+      user: {
+        password: "password",
+        password_confirmation: "password"
       }
-    end
+    }
 
     assert_redirected_to login_path
     assert_not_nil flash[:notice]
   end
 
   test "should handle errors" do
-    @confirmed_user.send_password_reset_email!
+    password_reset_token = @confirmed_user.generate_password_reset_token
 
-    put password_path(@confirmed_user.password_reset_token), params: {
+    put password_path(password_reset_token), params: {
       user: {
         password: "password",
         password_confirmation: "password_that_does_not_match"
@@ -100,9 +101,11 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should not update password if authenticated" do
+    password_reset_token = @confirmed_user.generate_password_reset_token
+
     login @confirmed_user
 
-    put password_path(@confirmed_user.password_reset_token), params: {
+    put password_path(password_reset_token), params: {
       user: {
         password: "password",
         password_confirmation: "password"

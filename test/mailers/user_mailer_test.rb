@@ -15,10 +15,11 @@ class UserMailerTest < ActionMailer::TestCase
   end
 
   test "password_reset" do
-    mail = UserMailer.password_reset(@user)
+    password_reset_token = @user.generate_password_reset_token
+    mail = UserMailer.password_reset(@user, password_reset_token)
     assert_equal "Password Reset Instructions", mail.subject
     assert_equal [@user.email], mail.to
     assert_equal [User::MAILER_FROM_EMAIL], mail.from
-    assert_match @user.password_reset_token, mail.body.encoded
+    assert_match password_reset_token, mail.body.encoded
   end
 end

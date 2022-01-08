@@ -604,70 +604,37 @@ class UsersController < ApplicationController
 end
 ```
 
-## Step 9: Add Password Reset Columns to Users Table
+## Step 9: Add Password Reset Functionality
 
-1. Create migration.
-
-```bash
-rails g migration add_password_reset_token_to_users password_reset_token:string password_reset_sent_at:datetime
-```
-
-2. Update the migration.
-
-```ruby
-# db/migrate/[timestamp]_add_password_reset_token_to_users.rb
-class AddPasswordResetTokenToUsers < ActiveRecord::Migration[6.1]
-  def change
-    add_column :users, :password_reset_token, :string, null: false
-    add_column :users, :password_reset_sent_at, :datetime
-    add_index :users, :password_reset_token, unique: true
-  end
-end
-```
-
-> **What's Going On Here?**
->
-> - The `password_reset_token` column will store a random value created through the [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) method when a record is saved. This will be used to identify users in a secure way when they need to reset their password. We add `null: false` to prevent empty values and also add a unique index to ensure that no two users will have the same `password_reset_token`. You can think of this as a secure alternative to the `id` column.
-> - The `password_reset_sent_at` column will be used to ensure a password reset link has not expired. This is an added layer of security to prevent a `password_reset_token` from being used multiple times.
-
-3. Run migration.
-
-```bash
-rails db:migrate
-```
-
-4. Update User Model.
+1. Update User Model.
 
 ```ruby
 # app/models/user.rb
 class User < ApplicationRecord
   ...
-  PASSWORD_RESET_TOKEN_EXPIRATION_IN_SECONDS = 10.minutes.to_i
+  PASSWORD_RESET_TOKEN_EXPIRATION = 10.minutes
   ...
-  has_secure_token :password_reset_token
-  ...
-  def password_reset_token_has_expired?
-    return true if password_reset_sent_at.nil?
-    (Time.current - password_reset_sent_at) >= User::PASSWORD_RESET_TOKEN_EXPIRATION_IN_SECONDS
+  def generate_password_reset_token
+    signed_id expires_in: PASSWORD_RESET_TOKEN_EXPIRATION, purpose: :reset_password
   end
-
+  ...
   def send_password_reset_email!
-    regenerate_password_reset_token
-    update_columns(password_reset_sent_at: Time.current)
-    UserMailer.password_reset(self).deliver_now
+    password_reset_token = generate_password_reset_token
+    UserMailer.password_reset(self, password_reset_token).deliver_now
   end
   ...
 end
 ```
 
-5. Update User Mailer.
+2. Update User Mailer.
 
 ```ruby
 # app/mailers/user_mailer.rb
 class UserMailer < ApplicationMailer
   ...
-  def password_reset(user)
+  def password_reset(user, password_reset_token)
     @user = user
+    @password_reset_token = password_reset_token
 
     mail to: @user.email, subject: "Password Reset Instructions"
   end
@@ -678,21 +645,20 @@ end
 <!-- app/views/user_mailer/password_reset.html.erb -->
 <h1>Password Reset Instructions</h1>
 
-<%= link_to "Click here to reset your password.", edit_password_url(@user.password_reset_token) %>
+<%= link_to "Click here to reset your password.", edit_password_url(@password_reset_token) %>
 ```
 
 ```text
 <!-- app/views/user_mailer/password_reset.text.erb -->
 Password Reset Instructions
 
-<%= edit_password_url(@user.password_reset_token) %>
+<%= edit_password_url(@password_reset_token) %>
 ```
 
 > **What's Going On Here?**
 >
-> - The `has_secure_token :password_reset_token` method is added to give us an [API](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) to work with the `password_reset_token` column.
-> - The `password_reset_token_has_expired?` method tells us if the password reset token is expired or not. This can be controlled by changing the value of the `PASSWORD_RESET_TOKEN_EXPIRATION_IN_SECONDS` constant. This will be useful when we build the password reset mailer.
-> - The `send_password_reset_email!` method will create a new `password_reset_token` and update the value of `password_reset_sent_at`. This is to ensure password reset links expire and cannot be reused. It will also send the password reset email to the user. We still need to build this.
+> - The `generate_password_reset_token` method creates a [signed_id](https://api.rubyonrails.org/classes/ActiveRecord/SignedId.html#method-i-signed_id) that will be used to securely identify the user. For added security, we ensure that this ID will expire in 10 minutes (this can be controlled with the `PASSWORD_RESET_TOKEN_EXPIRATION` constant) and give it an explicit purpose of `:reset_password`.
+> - The `send_password_reset_email!` method will create a new `password_reset_token`. This is to ensure password reset links expire and cannot be reused. It will also send the password reset email to the user.
 
 ## Step 10: Build Password Reset Forms
 
@@ -722,10 +688,10 @@ class PasswordsController < ApplicationController
   end
 
   def edit
-    @user = User.find_by(password_reset_token: params[:password_reset_token])
+    @user = User.find_signed(params[:password_reset_token], purpose: :reset_password)
     if @user.present? && @user.unconfirmed?
       redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
-    elsif @user.nil? || @user.password_reset_token_has_expired?
+    elsif @user.nil?
       redirect_to new_password_path, alert: "Invalid or expired token."
     end
   end
@@ -734,21 +700,18 @@ class PasswordsController < ApplicationController
   end
 
   def update
-    @user = User.find_by(password_reset_token: params[:password_reset_token])
+    @user = User.find_signed(params[:password_reset_token], purpose: :reset_password)
     if @user
       if @user.unconfirmed?
         redirect_to new_confirmation_path, alert: "You must confirm your email before you can sign in."
-      elsif @user.password_reset_token_has_expired?
-        redirect_to new_password_path, alert: "Incorrect email or password."
       elsif @user.update(password_params)
-        @user.regenerate_password_reset_token
-        redirect_to login_path, notice: "Signed in."
+        redirect_to login_path, notice: "Sign in."
       else
         flash.now[:alert] = @user.errors.full_messages.to_sentence
         render :edit, status: :unprocessable_entity
       end
     else
-      flash.now[:alert] = "Incorrect email or password."
+      flash.now[:alert] = "Invalid or expired token."
       render :new, status: :unprocessable_entity
     end
   end
@@ -761,15 +724,18 @@ class PasswordsController < ApplicationController
 end
 ```
 
+> - The `edit` action is used to confirm a user's email. This will be the page that a user lands on when they click the confirmation link in their email. We still need to build this. Note that we're looking up a user through the [find_signed](https://api.rubyonrails.org/classes/ActiveRecord/SignedId/ClassMethods.html#method-i-find_signed) method and not their email or ID. This is because The `confirmation_token` is randomly generated and can't be guessed or tampered with unlike an email or numeric ID. This is also why we added `param: :confirmation_token` as a [named route parameter](https://guides.rubyonrails.org/routing.html#overriding-named-route-parameters).
+>  
+
 > **What's Going On Here?**
 >
 > - The `create` action will send an email to the user containing a link that will allow them to reset the password. The link will contain their `password_reset_token` which is unique and expires. Note that we call `downcase` on the email to account for case sensitivity when searching.
->   - Note that we return `If that user exists we've sent instructions to their email.` even if the user is not found. This makes it difficult for a bad actor to use the reset form to see which email accounts exist on the application.
-> - The `edit` action renders simply renders the form for the user to update their password. It attempts to find a user by their `password_reset_token`. You can think of the `password_reset_token` as a way to identify the user much like how we normally identify records by their ID. However, the `password_reset_token` is randomly generated and will expire so it's more secure.
+>   - You'll remember that the `password_reset_token` is a [signed_id](https://api.rubyonrails.org/classes/ActiveRecord/SignedId.html#method-i-signed_id), and is set to expire in 10 minutes. You'll also note that we need to pass the method `purpose: :reset_password` to be consistent with the purpose that was set in the `generate_confirmation_token` method. 
+>   - Note that we return `Invalid or expired token.` if the user is not found. This makes it difficult for a bad actor to use the reset form to see which email accounts exist on the application.
+> - The `edit` action simply renders the form for the user to update their password. It attempts to find a user by their `password_reset_token`. You can think of the `password_reset_token` as a way to identify the user much like how we normally identify records by their ID. However, the `password_reset_token` is randomly generated and will expire so it's more secure.
 > - The `new` action simply renders a form for the user to put their email address in to receive the password reset email.
 > - The `update` also ensures the user is identified by their `password_reset_token`. It's not enough to just do this on the `edit` action since a bad actor could make a `PUT` request to the server and bypass the form.
->   - If the user exists and is confirmed and their password token has not expired, we update their password to the one they will set in the form. Otherwise, we handle each failure case differently.
->   - Note that we call `@user.regenerate_password_reset_token` to ensure their `password_reset_token` is reset so that it cannot be used again.
+>   - If the user exists and is confirmed we update their password to the one they will set in the form. Otherwise, we handle each failure case differently.
 
 2. Update Routes.
 
@@ -797,7 +763,7 @@ end
 
 ```html+ruby
 <!-- app/views/passwords/edit.html.erb -->
-<%= form_with url: password_path(@user.password_reset_token), scope: :user, method: :put do |form| %>
+<%= form_with url: password_path(params[:password_reset_token]), scope: :user, method: :put do |form| %>
   <div>
     <%= form.label :password %>
     <%= form.password_field :password, required: true %>
