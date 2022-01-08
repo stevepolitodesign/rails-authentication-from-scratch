@@ -1,4 +1,4 @@
-<%= form_with url: password_path(@user.password_reset_token), scope: :user, method: :put do |form| %>
+<%= form_with url: password_path(params[:password_reset_token]), scope: :user, method: :put do |form| %>
   <div>
     <%= form.label :password %>
     <%= form.password_field :password, required: true %>
