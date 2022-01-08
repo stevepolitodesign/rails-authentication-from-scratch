@@ -97,28 +97,10 @@ class UserTest < ActiveSupport::TestCase
 
   test "should respond to send_password_reset_email!" do
     @user.save!
-    original_password_reset_token = @user.password_reset_token
-
-    freeze_time
-
-    assert_nil @user.password_reset_sent_at
 
     assert_emails 1 do
       @user.send_password_reset_email!
     end
-
-    assert_not_equal original_password_reset_token, @user.reload.password_reset_token
-    assert_equal Time.now, @user.password_reset_sent_at
-  end
-
-  test "should respond to password_reset_token_has_expired?" do
-    assert @user.password_reset_token_has_expired?
-
-    @user.password_reset_sent_at = 1.minute.ago
-    assert_not @user.password_reset_token_has_expired?
-
-    @user.password_reset_sent_at = 601.seconds.ago
-    assert @user.password_reset_token_has_expired?
   end
 
   test "should downcase unconfirmed_email" do
@@ -186,5 +168,19 @@ class UserTest < ActiveSupport::TestCase
     @user.save!
 
     assert_not_nil @user.reload.session_token
+  end
+
+  test "should generate confirmation token" do
+    @user.save!
+    confirmation_token = @user.generate_confirmation_token
+
+    assert_equal @user, User.find_signed(confirmation_token, purpose: :confirm_email)
+  end
+
+  test "should generate password reset token" do
+    @user.save!
+    password_reset_token = @user.generate_password_reset_token
+
+    assert_equal @user, User.find_signed(password_reset_token, purpose: :reset_password)
   end
 end
