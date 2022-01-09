@@ -127,8 +127,6 @@ class ConfirmationsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should prevent authenticated user from submitting the confirmation form" do
-    freeze_time
-
     login @confirmed_user
 
     get new_confirmation_path
