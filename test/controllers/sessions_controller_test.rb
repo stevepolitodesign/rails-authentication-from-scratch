@@ -18,15 +18,17 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to root_path
   end
 
-  test "should login if confirmed" do
-    post login_path, params: {
-      user: {
-        email: @confirmed_user.email,
-        password: @confirmed_user.password
+  test "should login and create active session if confirmed" do
+    assert_difference("@confirmed_user.active_sessions.count") do
+      post login_path, params: {
+        user: {
+          email: @confirmed_user.email,
+          password: @confirmed_user.password
+        }
       }
-    }
+    end
     assert_redirected_to root_path
-    assert_equal @confirmed_user.email, current_user.email
+    assert_equal @confirmed_user, current_user
   end
 
   test "should remember user when logging in" do
@@ -82,10 +84,12 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_nil current_user
   end
 
-  test "should logout if authenticated" do
+  test "should logout and delete current active session if authenticated" do
     login @confirmed_user
 
-    delete logout_path
+    assert_difference("@confirmed_user.active_sessions.count", -1) do
+      delete logout_path
+    end
 
     assert_nil current_user
     assert_redirected_to root_path
@@ -97,19 +101,5 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
 
     delete logout_path
     assert_redirected_to root_path
-  end
-
-  test "should reset session_token when logging out" do
-    login @confirmed_user
-
-    assert_changes "@confirmed_user.reload.session_token" do
-      delete logout_path
-    end
-  end
-
-  test "should reset session_token when logging in" do
-    assert_changes "@confirmed_user.reload.session_token" do
-      login @confirmed_user
-    end
   end
 end
