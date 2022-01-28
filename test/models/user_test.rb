@@ -164,23 +164,20 @@ class UserTest < ActiveSupport::TestCase
     end
   end
 
-  test "should set session_token on create" do
+  test "should create active session" do
     @user.save!
 
-    assert_not_nil @user.reload.session_token
+    assert_difference("@user.active_sessions.count", 1) do
+      @user.active_sessions.create!
+    end
   end
 
-  test "should generate confirmation token" do
+  test "should destroy associated active session when destryoed" do
     @user.save!
-    confirmation_token = @user.generate_confirmation_token
+    @user.active_sessions.create!
 
-    assert_equal @user, User.find_signed(confirmation_token, purpose: :confirm_email)
-  end
-
-  test "should generate password reset token" do
-    @user.save!
-    password_reset_token = @user.generate_password_reset_token
-
-    assert_equal @user, User.find_signed(password_reset_token, purpose: :reset_password)
+    assert_difference("@user.active_sessions.count", -1) do
+      @user.destroy!
+    end
   end
 end

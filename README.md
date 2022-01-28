@@ -1182,7 +1182,7 @@ end
 <% end %>
 ```
 
-## Step 15: Add Friendly Redirects
+## Step 17: Add Friendly Redirects
 
 1. Update Authentication Concern.
 
@@ -1301,47 +1301,54 @@ end
 >
 > - We refactor the `create` method to always start by finding and authenticating the user. Not only does this prevent timing attacks, but it also prevents accidentally leaking email addresses. This is because we were originally checking if a user was confirmed before authenticating them. That means a bad actor could try and sign in with an email address to see if it exists on the system without needing to know the password.
 
-## Step 18: Account for Session Replay Attacks
+## Step 18: Store Session in the Database
 
-**Note that this refactor prevents a user from being logged into multiple devices and browsers at one time.**
+We're currently setting the user's ID in the session. Even though that value is encrypted, the encrypted value doesn't change since it's based on the user id which doesn't change. This means that if a bad actor were to get a copy of the session they would have access to a victim's account in perpetuity. One solution is to [rotate encrypted and signed cookie configurations](https://guides.rubyonrails.org/security.html#rotating-encrypted-and-signed-cookies-configurations). Another option is to configure the [Rails session store](https://guides.rubyonrails.org/configuring.html#config-session-store) to use `mem_cache_store` to store session data. 
 
-We're currently setting the user's ID in the session. Even though that value is encrypted, the encrypted value doesn't change since it's based on the user id which doesn't change. This means that if a bad actor were to get a copy of the session they would have access to a victim's account in perpetuity. One solution is to [rotate encrypted and signed cookie configurations](https://guides.rubyonrails.org/security.html#rotating-encrypted-and-signed-cookies-configurations). Another solution is to use a rotating value to identify the user (which is what we'll be doing). A third option is to configure the [Rails session store](https://guides.rubyonrails.org/configuring.html#config-session-store) to use `mem_cache_store` to store session data.
+The solution we will implement is to set a rotating value to identify the user and store that value in the database.
 
-You can read more about session replay attacks [here](https://binarysolo.chapter24.blog/avoiding-session-replay-attacks-in-rails/).
-
-1. Add a session_token column to the users table.
+1. Generate ActiveSession model.
 
 ```bash
-rails g migration add_session_token_to_users session_token:string
+rails g model active_session user:references
 ```
 
-2. Update migration.
+2. Update the migration.
+
 ```ruby
-# db/migrate/[timestamp]_add_session_token_to_users.rb
-class AddSessionTokenToUsers < ActiveRecord::Migration[6.1]
+class CreateActiveSessions < ActiveRecord::Migration[6.1]
   def change
-    add_column :users, :session_token, :string, null: false
-    add_index :users, :session_token, unique: true
+    create_table :active_sessions do |t|
+      t.references :user, null: false, foreign_key: {on_delete: :cascade}
+
+      t.timestamps
+    end
   end
 end
 ```
 
 > **What's Going On Here?**
 >
-> - Similar to the `remember_token` column, we prevent the `session_token` from being null and enforce that it has a unique value.
+> - We update the `foreign_key` option from `true` to `{on_delete: :cascade}`. The [on_delete](https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/SchemaStatements.html#method-i-add_foreign_key-label-Creating+a+cascading+foreign+key) option will delete any `active_session` record if its associated `user` is deleted from the database.
 
-3. Update User Model.
+3. Run migration.
+
+```bash
+rails db:migrate
+```
+
+4. Update User model.
 
 ```ruby
 # app/models/user.rb
 class User < ApplicationRecord
   ...
-  has_secure_token :session_token
+  has_many :active_sessions, dependent: :destroy
   ...
 end
 ```
 
-4. Update Authentication Concern.
+5. Update Authentication Concern
 
 ```ruby
 # app/controllers/concerns/authentication.rb
@@ -1349,21 +1356,21 @@ module Authentication
   ...
   def login(user)
     reset_session
-    user.regenerate_session_token
-    session[:current_user_session_token] = user.reload.session_token
+    active_session = user.active_sessions.create!
+    session[:current_active_session_id] = active_session.id
   end
   ...
   def logout
-    user = current_user
+    active_session = ActiveSession.find_by(id: session[:current_active_session_id])
     reset_session
-    user.regenerate_session_token
+    active_session.destroy! if active_session.present?
   end
   ...
   private
 
   def current_user
-    Current.user ||= if session[:current_user_session_token].present?
-      User.find_by(session_token: session[:current_user_session_token])
+    Current.user = if session[:current_active_session_id].present?
+      ActiveSession.find_by(id: session[:current_active_session_id]).user
     elsif cookies.permanent.encrypted[:remember_token].present?
       User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
     end
@@ -1374,11 +1381,11 @@ end
 
 > **What's Going On Here?**
 >
-> - We update the `login` method by adding a call to `user.regenerate_session_token`. This will reset the value of the `session_token` through the [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) API. We then store that value in the session.
-> - We updated the `logout` method by first setting the `current_user` as a variable. This is because once we call `reset_session`, we lose access to the `current_user`. We then call `user.regenerate_session_token` which will update the value of the `session_token` on the user that just signed out.
-> - Finally we update the `current_user` method to look for the `session[:current_user_session_token]` instead of the `session[:current_user_id]` and to query for the User by the `session_token` value.
+> - We update the `login` method by creating a new `active_session` record and then storing it's ID in the `session`. Note that we replaced `session[:current_user_id]` with `session[:current_active_session_id]`.
+> - We update the `logout` method by first finding the `active_session` record from the `session`. After we call `reset_session` we then delete the `active_session` record if it exists. We need to check if it exists because in a future section we will allow a user to log out all current active sessions.
+> - We update the `current_user` method by finding the `active_session` record from the `session`, and then returning its associated `user`. Note that we've replaced all instances of `session[:current_user_id]` with `session[:current_active_session_id]`.
 
-5. Force SSL.
+6. Force SSL.
 
 ```ruby
 # config/environments/production.rb
