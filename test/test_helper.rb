@@ -11,7 +11,7 @@ class ActiveSupport::TestCase
 
   # Add more helper methods to be used by all tests here...
   def current_user
-    session[:current_user_session_token] && User.find_by(session_token: session[:current_user_session_token])
+    session[:current_active_session_id] && ActiveSession.find_by(id: session[:current_active_session_id]).user
   end
 
   def login(user, remember_user: nil)
@@ -25,6 +25,6 @@ class ActiveSupport::TestCase
   end
 
   def logout
-    session.delete(:current_user_id)
+    session.delete(:current_active_session_id)
   end
 end
