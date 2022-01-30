@@ -963,7 +963,7 @@ end
 
 > **What's Going On Here?**
 >
-> - We call `redirect_if_authenticated` before editing, destroying, or updating a user since only an authenticated user should be able to do this.
+> - We call `authenticate_user!` before editing, destroying, or updating a user since only an authenticated user should be able to do this.
 > - We update the `create` method to accept `create_user_params` (formerly `user_params`). This is because we're going to require different parameters for creating an account vs. editing an account.
 > - The `destroy` action simply deletes the user and logs them out. Note that we're calling `current_user`, so this action can only be scoped to the user who is logged in.
 > - The `edit` action simply assigns `@user` to the `current_user` so that we have access to the user in the edit form.
