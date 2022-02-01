@@ -1398,3 +1398,88 @@ end
 > **What's Going On Here?**
 >
 > - We force SSL in production to prevent [session hijacking](https://guides.rubyonrails.org/security.html#session-hijacking). Even though the session is encrypted we want to prevent the cookie from being exposed through an insecure network. If it were exposed, a bad actor could sign in as the victim.
+
+## Step 19: Capture Request Details for Each New Session
+
+1. Add new columns to the active_sessions table.
+
+```bash
+rails g migration add_request_columns_to_active_sessions user_agent:string ip_address:string
+rails db:migrate
+```
+
+2. Update login method to capture request details.
+
+```ruby
+# app/controllers/concerns/authentication.rb
+module Authentication
+  ...
+  def login(user)
+    reset_session
+    active_session = user.active_sessions.create!(user_agent: request.user_agent, ip_address: request.ip)
+    session[:current_active_session_id] = active_session.id
+  end
+  ...
+end
+```
+
+> **What's Going On Here?**
+>
+> - We add columns to the `active_sessions` table to store data about when and where these sessions are being created. We are able to do this by tapping into the [request object](https://api.rubyonrails.org/classes/ActionDispatch/Request.html) and returning the [ip](https://api.rubyonrails.org/classes/ActionDispatch/Request.html#method-i-ip) and user agent. The user agent is simply the browser and device.
+ 
+
+4. Update Users Controller.
+
+```ruby
+# app/controllers/users_controller.rb
+class UsersController < ApplicationController
+  ...
+  def edit
+    @user = current_user
+    @active_sessions = @user.active_sessions.order(created_at: :desc)
+  end
+  ...
+  def update
+    @user = current_user
+    @active_sessions = @user.active_sessions.order(created_at: :desc)
+    ...
+  end
+end
+```
+
+5. Create active session partial.
+
+```html+ruby
+<!-- app/views/active_sessions/_active_session.html.erb -->
+<td><%= active_session.user_agent %></td>
+<td><%= active_session.ip_address %></td>
+<td><%= active_session.created_at %></td>
+```
+
+6. Update account page.
+
+```html+ruby
+<!--  app/views/users/edit.html.erb -->
+...
+<h2>Current Logins</h2>
+<% if @active_sessions.any? %>
+  <table>
+    <thead>
+      <tr>
+        <th>User Agent</th>
+        <th>IP Address</th>
+        <th>Signed In At</th>
+      </tr>
+    </thead>
+    <tbody>
+      <%= render @active_sessions %>
+    </tbody>
+  </table>
+<% end %>
+```
+
+> **What's Going On Here?**
+>
+> - We're simply showing any `active_session` associated with the `current_user`. By rendering the `user_agent`, `ip_address`, and `created_at` values we're giving the `current_user` all the information they need to know if there's any suspicious activity happening with their account. For example, if there's an `active_session` with a unfamiliar IP address or browser, this could indicate that the user's account has been compromised.
+> - Note that we also instantiate `@active_sessions` in the `update` method. This is because the `update` method renders the `edit` method during failure cases.
+
