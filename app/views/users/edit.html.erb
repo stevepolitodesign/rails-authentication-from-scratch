@@ -23,3 +23,20 @@
   </div>
   <%= form.submit "Update Account" %>
 <% end %>
+<h2>Current Logins</h2>
+<% if @active_sessions.any? %>
+  <table>
+    <thead>
+      <tr>
+        <th>User Agent</th>
+        <th>IP Address</th>
+        <th>Signed In At</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <%= render @active_sessions %>
+      </tr>
+    </tbody>
+  </table>
+<% end %>
