@@ -14,4 +14,22 @@ class UserInterfaceTest < ActionDispatch::IntegrationTest
     assert_match "Mozilla", @response.body
     assert_match "123.457.789", @response.body
   end
+
+  test "should render buttons to delete specific active sessions" do
+    login @confirmed_user
+
+    get account_path
+
+    assert_select "input[type='submit']" do
+      assert_select "[value=?]", "Log out of all other sessions"
+    end
+    assert_match destroy_all_active_sessions_path, @response.body
+
+    assert_select "table" do
+      assert_select "input[type='submit']" do
+        assert_select "[value=?]", "Sign Out"
+      end
+    end
+    assert_match active_session_path(@confirmed_user.active_sessions.last), @response.body
+  end
 end
