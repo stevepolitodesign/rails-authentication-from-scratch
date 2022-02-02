@@ -1451,9 +1451,11 @@ end
 
 ```html+ruby
 <!-- app/views/active_sessions/_active_session.html.erb -->
-<td><%= active_session.user_agent %></td>
-<td><%= active_session.ip_address %></td>
-<td><%= active_session.created_at %></td>
+<tr>
+  <td><%= active_session.user_agent %></td>
+  <td><%= active_session.ip_address %></td>
+  <td><%= active_session.created_at %></td>
+</tr>
 ```
 
 6. Update account page.
@@ -1483,3 +1485,114 @@ end
 > - We're simply showing any `active_session` associated with the `current_user`. By rendering the `user_agent`, `ip_address`, and `created_at` values we're giving the `current_user` all the information they need to know if there's any suspicious activity happening with their account. For example, if there's an `active_session` with a unfamiliar IP address or browser, this could indicate that the user's account has been compromised.
 > - Note that we also instantiate `@active_sessions` in the `update` method. This is because the `update` method renders the `edit` method during failure cases.
 
+## Step 20: Allow User to Sign Out Specific Active Sessions
+
+1. Generate the Active Sessions Controller and update routes.
+
+```
+rails g controller active_sessions
+```
+
+```ruby
+# app/controllers/active_sessions_controller.rb
+class ActiveSessionsController < ApplicationController
+  before_action :authenticate_user!
+
+  def destroy
+    @active_session = current_user.active_sessions.find(params[:id])
+
+    @active_session.destroy
+
+    if current_user
+      redirect_to account_path, notice: "Session deleted."
+    else
+      reset_session
+      redirect_to root_path, notice: "Signed out."
+    end
+  end
+
+  def destroy_all
+    current_user
+
+    current_user.active_sessions.destroy_all
+    reset_session
+
+    redirect_to root_path, notice: "Signed out."
+  end
+end
+```
+
+```ruby
+# config/routes.rb
+Rails.application.routes.draw do
+  ...
+  resources :active_sessions, only: [:destroy] do
+    collection do
+      delete "destroy_all"
+    end
+  end
+end
+```
+
+> **What's Going On Here?**
+>
+> - We ensure only users who are logged in can access these endpoints by calling `before_action :authenticate_user!`.
+> - The `destroy` method simply looks for an `active_session` associated with the `current_user`. This ensures that a user can only delete sessions associated with their account.
+>   - Once we destroy the `active_session` we then redirect back to the account page or to the homepage. This is because a user may not be deleting a session for the device or browser they're currently logged into. Note that we only call [reset_session](https://api.rubyonrails.org/classes/ActionDispatch/Request.html#method-i-reset_session) if the user has deleted a session for the device or browser they're currently logged into, as this is the same as logging out.
+> - The `destroy_all` method is a [collection route](https://guides.rubyonrails.org/routing.html#adding-collection-routes) that will destroy all `active_session` records associated with the `current_user`. Note that we call `reset_session` because we will be logging out the `current_user` during this request.
+
+2. Update views by adding buttons to destroy sessions. 
+
+```html+ruby
+<!-- app/views/users/edit.html.erb -->
+...
+<h2>Current Logins</h2>
+<% if @active_sessions.any? %> 
+  <%= button_to "Log out of all other sessions", destroy_all_active_sessions_path, method: :delete %>
+  <table>
+    <thead>
+      <tr>
+        <th>User Agent</th>
+        <th>IP Address</th>
+        <th>Signed In At</th>
+        <th>Sign Out</th>
+      </tr>
+    </thead>
+    <tbody>
+      <%= render @active_sessions %>
+    </tbody>
+  </table>
+<% end %>
+```
+
+```html+ruby
+<tr>
+  <td><%= active_session.user_agent %></td>
+  <td><%= active_session.ip_address %></td>
+  <td><%= active_session.created_at %></td>
+  <td><%= button_to "Sign Out", active_session_path(active_session), method: :delete %></td>
+</tr>
+```
+
+3. Update Authentication Concern.
+
+```ruby
+# app/controllers/concerns/authentication.rb
+module Authentication
+  ...
+  private
+
+  def current_user
+    Current.user = if session[:current_active_session_id].present?
+      ActiveSession.find_by(id: session[:current_active_session_id])&.user
+    elsif cookies.permanent.encrypted[:remember_token].present?
+      User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
+    end
+  end
+  ...
+end
+```
+
+> **What's Going On Here?**
+>
+> - This is a very subtle change, but we've added a [safe navigation operator](https://ruby-doc.org/core-2.6/doc/syntax/calling_methods_rdoc.html#label-Safe+navigation+operator) via the `&.user` call. This is because `ActiveSession.find_by(id: session[:current_active_session_id])` can now return `nil` since we're able to delete other `active_session` records.

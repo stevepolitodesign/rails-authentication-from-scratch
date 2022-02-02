@@ -1,3 +1,6 @@
-<td><%= active_session.user_agent %></td>
-<td><%= active_session.ip_address %></td>
-<td><%= active_session.created_at %></td>
+<tr>
+  <td><%= active_session.user_agent %></td>
+  <td><%= active_session.ip_address %></td>
+  <td><%= active_session.created_at %></td>
+  <td><%= button_to "Sign Out", active_session_path(active_session), method: :delete %></td>
+</tr>

@@ -24,19 +24,19 @@
   <%= form.submit "Update Account" %>
 <% end %>
 <h2>Current Logins</h2>
-<% if @active_sessions.any? %>
+<% if @active_sessions.any? %> 
+  <%= button_to "Log out of all other sessions", destroy_all_active_sessions_path, method: :delete %>
   <table>
     <thead>
       <tr>
         <th>User Agent</th>
         <th>IP Address</th>
         <th>Signed In At</th>
+        <th>Sign Out</th>
       </tr>
     </thead>
     <tbody>
-      <tr>
-        <%= render @active_sessions %>
-      </tr>
+      <%= render @active_sessions %>
     </tbody>
   </table>
 <% end %>
