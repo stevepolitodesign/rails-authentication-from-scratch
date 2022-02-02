@@ -1,0 +1,2 @@
+module ActiveSessionsHelper
+end
