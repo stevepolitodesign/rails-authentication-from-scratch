@@ -11,7 +11,12 @@ class ActiveSupport::TestCase
 
   # Add more helper methods to be used by all tests here...
   def current_user
-    session[:current_active_session_id] && ActiveSession.find_by(id: session[:current_active_session_id])&.user
+    if session[:current_active_session_id].present?
+      ActiveSession.find_by(id: session[:current_active_session_id])&.user
+    else
+      cookies[:remember_token].present?
+      ActiveSession.find_by(remember_token: cookies[:remember_token])&.user
+    end
   end
 
   def login(user, remember_user: nil)
