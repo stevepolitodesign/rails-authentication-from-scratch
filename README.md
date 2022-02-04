@@ -1596,3 +1596,123 @@ end
 > **What's Going On Here?**
 >
 > - This is a very subtle change, but we've added a [safe navigation operator](https://ruby-doc.org/core-2.6/doc/syntax/calling_methods_rdoc.html#label-Safe+navigation+operator) via the `&.user` call. This is because `ActiveSession.find_by(id: session[:current_active_session_id])` can now return `nil` since we're able to delete other `active_session` records.
+
+## Step 21: Refactor Remember Logic
+
+Since we're now associating our sessions with an `active_session` and not a `user`, we'll want to remove the `remember_token` token from the `users` table and onto the `active_sessions`.
+
+1. Move remember_token column from users to active_sessions table.
+
+```bash
+rails g migration move_remember_token_from_users_to_active_sessions
+```
+
+```ruby
+# db/migrate/[timestamp]_move_remember_token_from_users_to_active_sessions.rb
+class MoveRememberTokenFromUsersToActiveSessions < ActiveRecord::Migration[6.1]
+  def change
+    remove_column :users, :remember_token
+    add_column :active_sessions, :remember_token, :string, null: false
+
+    add_index :active_sessions, :remember_token, unique: true
+  end
+end
+```
+
+> **What's Going On Here?**
+>
+> - We add `null: false` to ensure this column always has a value.
+> - We add a [unique index](https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/Table.html#method-i-index) to ensure this column has unique data.
+
+2. Update User Model.
+
+```diff
+ class User < ApplicationRecord
+    ...
+-   has_secure_password
+    ...
+ end
+```
+
+3. Update Active Session Model.
+
+```ruby
+# app/models/active_session.rb
+class ActiveSession < ApplicationRecord
+  ...
+  has_secure_token :remember_token
+end
+```
+
+> **What's Going On Here?**
+>
+> - We call [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) on the `remember_token`. This ensures that the value for this column will be set when the record is created. This value will be used later to securely identify the user.
+> - Note that we remove this from the `user` model.
+
+4. Refactor the Authentication Concern.
+
+```ruby
+# app/controllers/concerns/authentication.rb
+module Authentication
+  ...
+  def login(user)
+    reset_session
+    active_session = user.active_sessions.create!(user_agent: request.user_agent, ip_address: request.ip)
+    session[:current_active_session_id] = active_session.id
+
+    active_session
+  end
+
+  def forget(user)
+    cookies.delete :remember_token
+  end
+  ...
+  def remember(active_session)
+    cookies.permanent.encrypted[:remember_token] = active_session.remember_token
+  end
+  ...
+  private
+
+  def current_user
+    Current.user = if session[:current_active_session_id].present?
+      ActiveSession.find_by(id: session[:current_active_session_id])&.user
+    elsif cookies.permanent.encrypted[:remember_token].present?
+      ActiveSession.find_by(remember_token: cookies.permanent.encrypted[:remember_token])&.user
+    end
+  end
+  ...
+end
+```
+
+> **What's Going On Here?**
+> 
+> - The `login` method now returns the `active_session`. This will be used later when calling `SessionsController#create`.
+> - The `forget` method simply deletes the `cookie`. We don't need to call `active_session.regenerate_remember_token` since the `active_session` will be deleted, and therefor cannot be referenced again.
+> - The `remember` method now accepts an `active_session` and not a `user`. We do not need to call `active_session.regenerate_remember_token` since a new `active_session` record will be created each time a user logs in. Note that we now save `active_session.remember_token` to the cookie.
+> - The `current_user` method now finds the `active_session` record if the `remember_token` is present and returns the user via the [safe navigation operator](https://ruby-doc.org/core-2.6/doc/syntax/calling_methods_rdoc.html#label-Safe+navigation+operator).
+
+5. Refactor the Sessions Controller.
+
+```ruby
+# app/controllers/sessions_controller.rb
+class SessionsController < ApplicationController
+  def create
+    ...
+    if @user
+      if @user.unconfirmed?
+        ...
+      else
+        ...
+        active_session = login @user
+        remember(active_session) if params[:user][:remember_me] == "1"
+      end
+    else
+    ...
+    end
+  end
+end
+```
+
+> **What's Going On Here?**
+> 
+> - Since the `login` method now returns an `active_session`, we can take that value and pass it to `remember`.
