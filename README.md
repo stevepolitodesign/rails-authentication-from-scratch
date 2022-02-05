@@ -855,7 +855,7 @@ end
 # app/mailers/user_mailer.rb
 class UserMailer < ApplicationMailer
 
-  def confirmation(user)
+  def confirmation(user, confirmation_token)
     ...
     mail to: @user.confirmable_email, subject: "Confirmation Instructions"
   end
@@ -1195,10 +1195,12 @@ module Authentication
     ...
   end
   ...
+  private
+  ...
   def store_location
     session[:user_return_to] = request.original_url if request.get? && request.local?
   end
-  ...
+
 end
 ```
 
@@ -1461,7 +1463,7 @@ end
 6. Update account page.
 
 ```html+ruby
-<!--  app/views/users/edit.html.erb -->
+<!-- app/views/users/edit.html.erb -->
 ...
 <h2>Current Logins</h2>
 <% if @active_sessions.any? %>
@@ -1512,8 +1514,6 @@ class ActiveSessionsController < ApplicationController
   end
 
   def destroy_all
-    current_user
-
     current_user.active_sessions.destroy_all
     reset_session
 
@@ -1566,6 +1566,7 @@ end
 ```
 
 ```html+ruby
+<!-- app/views/active_sessions/_active_session.html.erb -->
 <tr>
   <td><%= active_session.user_agent %></td>
   <td><%= active_session.ip_address %></td>
@@ -1619,22 +1620,28 @@ class MoveRememberTokenFromUsersToActiveSessions < ActiveRecord::Migration[6.1]
 end
 ```
 
+2. Run migration.
+
+```bash
+rails db:migrate
+```
+
 > **What's Going On Here?**
 >
 > - We add `null: false` to ensure this column always has a value.
 > - We add a [unique index](https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/Table.html#method-i-index) to ensure this column has unique data.
 
-2. Update User Model.
+3. Update User Model.
 
 ```diff
  class User < ApplicationRecord
     ...
--   has_secure_password
+-   has_secure_token :remember_token
     ...
  end
 ```
 
-3. Update Active Session Model.
+4. Update Active Session Model.
 
 ```ruby
 # app/models/active_session.rb
@@ -1649,7 +1656,7 @@ end
 > - We call [has_secure_token](https://api.rubyonrails.org/classes/ActiveRecord/SecureToken/ClassMethods.html#method-i-has_secure_token) on the `remember_token`. This ensures that the value for this column will be set when the record is created. This value will be used later to securely identify the user.
 > - Note that we remove this from the `user` model.
 
-4. Refactor the Authentication Concern.
+5. Refactor the Authentication Concern.
 
 ```ruby
 # app/controllers/concerns/authentication.rb
@@ -1663,7 +1670,7 @@ module Authentication
     active_session
   end
 
-  def forget(user)
+  def forget_active_session
     cookies.delete :remember_token
   end
   ...
@@ -1687,11 +1694,11 @@ end
 > **What's Going On Here?**
 > 
 > - The `login` method now returns the `active_session`. This will be used later when calling `SessionsController#create`.
-> - The `forget` method simply deletes the `cookie`. We don't need to call `active_session.regenerate_remember_token` since the `active_session` will be deleted, and therefor cannot be referenced again.
+> - The `forget` method has been renamed to `forget_active_session` and no longer takes any arguments. This method simply deletes the `cookie`. We don't need to call `active_session.regenerate_remember_token` since the `active_session` will be deleted, and therefor cannot be referenced again.
 > - The `remember` method now accepts an `active_session` and not a `user`. We do not need to call `active_session.regenerate_remember_token` since a new `active_session` record will be created each time a user logs in. Note that we now save `active_session.remember_token` to the cookie.
 > - The `current_user` method now finds the `active_session` record if the `remember_token` is present and returns the user via the [safe navigation operator](https://ruby-doc.org/core-2.6/doc/syntax/calling_methods_rdoc.html#label-Safe+navigation+operator).
 
-5. Refactor the Sessions Controller.
+6. Refactor the Sessions Controller.
 
 ```ruby
 # app/controllers/sessions_controller.rb
@@ -1710,9 +1717,39 @@ class SessionsController < ApplicationController
     ...
     end
   end
+
+   def destroy
+    forget_active_session
+    ...
+  end
 end
 ```
 
 > **What's Going On Here?**
 > 
 > - Since the `login` method now returns an `active_session`, we can take that value and pass it to `remember`.
+> - We replace `forget(current_user)` with `forget_active_session` to reflect changes to the method name and structure.
+
+7. Refactor Active Sessions Controller
+
+```ruby
+# app/controllers/active_sessions_controller.rb
+class ActiveSessionsController < ApplicationController
+  ...
+  def destroy
+    ...
+    if current_user
+    ...
+    else
+      forget_active_session
+      ...
+    end
+  end
+
+  def destroy_all
+    forget_active_session
+    current_user.active_sessions.destroy_all
+    ...
+  end
+end
+```
