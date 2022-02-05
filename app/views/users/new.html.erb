@@ -2,7 +2,7 @@
   <%= render partial: "shared/form_errors", locals: { object: form.object } %>
   <div>
     <%= form.label :email %>
-    <%= form.text_field :email, required: true %>
+    <%= form.email_field :email, required: true %>
   </div>
   <div>
     <%= form.label :password %>
