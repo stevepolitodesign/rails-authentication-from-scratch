@@ -20,7 +20,7 @@ module Authentication
     active_session
   end
 
-  def forget(user)
+  def forget_active_session
     cookies.delete :remember_token
   end
 
@@ -38,10 +38,6 @@ module Authentication
     cookies.permanent.encrypted[:remember_token] = active_session.remember_token
   end
 
-  def store_location
-    session[:user_return_to] = request.original_url if request.get? && request.local?
-  end
-
   private
 
   def current_user
@@ -54,5 +50,9 @@ module Authentication
 
   def user_signed_in?
     Current.user.present?
+  end
+
+  def store_location
+    session[:user_return_to] = request.original_url if request.get? && request.local?
   end
 end
