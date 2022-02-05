@@ -216,7 +216,7 @@ end
   <%= render partial: "shared/form_errors", locals: { object: form.object } %>
   <div>
     <%= form.label :email %>
-    <%= form.text_field :email, required: true %>
+    <%= form.email_field :email, required: true %>
   </div>
   <div>
     <%= form.label :password %>
@@ -557,7 +557,7 @@ end
 <%= form_with url: login_path, scope: :user do |form| %>
   <div>
     <%= form.label :email %>
-    <%= form.text_field :email, required: true %>
+    <%= form.email_field :email, required: true %>
   </div>
   <div>
     <%= form.label :password %>
@@ -992,7 +992,7 @@ end
   <%= render partial: "shared/form_errors", locals: { object: form.object } %>
   <div>
     <%= form.label :email, "Current Email" %>
-    <%= form.text_field :email, disabled: true %>
+    <%= form.email_field :email, disabled: true %>
   </div>
   <div>
     <%= form.label :unconfirmed_email, "New Email" %>
