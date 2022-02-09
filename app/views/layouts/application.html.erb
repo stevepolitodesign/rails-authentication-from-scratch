@@ -17,7 +17,7 @@
       <% end %>
       <ul>
         <% if user_signed_in? %>
-          <li><%= link_to "My Acount", account_path %></li>
+          <li><%= link_to "My Account", account_path %></li>
            <li><%= button_to "Logout", logout_path, method: :delete %></li>
         <% else %>
            <li><%= link_to "Login", login_path %></li>
