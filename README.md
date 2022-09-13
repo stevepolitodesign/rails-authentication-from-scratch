@@ -730,11 +730,11 @@ end
 
 > **What's Going On Here?**
 >
+> - The `new` action simply renders a form for the user to put their email address in to receive the password reset email.
 > - The `create` action will send an email to the user containing a link that will allow them to reset the password. The link will contain their `password_reset_token` which is unique and expires. Note that we call `downcase` on the email to account for case sensitivity when searching.
 >   - You'll remember that the `password_reset_token` is a [signed_id](https://api.rubyonrails.org/classes/ActiveRecord/SignedId.html#method-i-signed_id), and is set to expire in 10 minutes. You'll also note that we need to pass the method `purpose: :reset_password` to be consistent with the purpose that was set in the `generate_password_reset_token` method. 
 >   - Note that we return `Invalid or expired token.` if the user is not found. This makes it difficult for a bad actor to use the reset form to see which email accounts exist on the application.
 > - The `edit` action simply renders the form for the user to update their password. It attempts to find a user by their `password_reset_token`. You can think of the `password_reset_token` as a way to identify the user much like how we normally identify records by their ID. However, the `password_reset_token` is randomly generated and will expire so it's more secure.
-> - The `new` action simply renders a form for the user to put their email address in to receive the password reset email.
 > - The `update` also ensures the user is identified by their `password_reset_token`. It's not enough to just do this on the `edit` action since a bad actor could make a `PUT` request to the server and bypass the form.
 >   - If the user exists and is confirmed we update their password to the one they will set in the form. Otherwise, we handle each failure case differently.
 
