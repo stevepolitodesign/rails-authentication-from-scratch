@@ -1,6 +1,9 @@
 class PasswordsController < ApplicationController
   before_action :redirect_if_authenticated
 
+  def new
+  end
+  
   def create
     @user = User.find_by(email: params[:user][:email].downcase)
     if @user.present?
@@ -22,9 +25,6 @@ class PasswordsController < ApplicationController
     elsif @user.nil?
       redirect_to new_password_path, alert: "Invalid or expired token."
     end
-  end
-
-  def new
   end
 
   def update

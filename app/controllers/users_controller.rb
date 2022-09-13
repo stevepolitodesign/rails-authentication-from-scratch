@@ -2,6 +2,10 @@ class UsersController < ApplicationController
   before_action :authenticate_user!, only: [:edit, :destroy, :update]
   before_action :redirect_if_authenticated, only: [:create, :new]
 
+  def new
+    @user = User.new
+  end
+
   def create
     @user = User.new(create_user_params)
     if @user.save
@@ -12,19 +16,9 @@ class UsersController < ApplicationController
     end
   end
 
-  def destroy
-    current_user.destroy
-    reset_session
-    redirect_to root_path, notice: "Your account has been deleted."
-  end
-
   def edit
     @user = current_user
     @active_sessions = @user.active_sessions.order(created_at: :desc)
-  end
-
-  def new
-    @user = User.new
   end
 
   def update
@@ -45,6 +39,12 @@ class UsersController < ApplicationController
       flash.now[:error] = "Incorrect password"
       render :edit, status: :unprocessable_entity
     end
+  end
+
+  def destroy
+    current_user.destroy
+    reset_session
+    redirect_to root_path, notice: "Your account has been deleted."
   end
 
   private

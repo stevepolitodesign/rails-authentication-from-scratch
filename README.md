@@ -176,6 +176,10 @@ rails g controller Users
 # app/controllers/users_controller.rb
 class UsersController < ApplicationController
 
+  def new
+    @user = User.new
+  end
+  
   def create
     @user = User.new(user_params)
     if @user.save
@@ -183,10 +187,6 @@ class UsersController < ApplicationController
     else
       render :new, status: :unprocessable_entity
     end
-  end
-
-  def new
-    @user = User.new
   end
 
   private
@@ -254,6 +254,10 @@ rails g controller Confirmations
 # app/controllers/confirmations_controller.rb
 class ConfirmationsController < ApplicationController
 
+  def new
+    @user = User.new
+  end
+
   def create
     @user = User.find_by(email: params[:user][:email].downcase)
 
@@ -273,10 +277,6 @@ class ConfirmationsController < ApplicationController
     else
       redirect_to new_confirmation_path, alert: "Invalid token."
     end
-  end
-
-  def new
-    @user = User.new
   end
 
 end
@@ -509,6 +509,9 @@ rails g controller Sessions
 class SessionsController < ApplicationController
   before_action :redirect_if_authenticated, only: [:create, :new]
 
+  def new
+  end
+
   def create
     @user = User.find_by(email: params[:user][:email].downcase)
     if @user
@@ -530,9 +533,6 @@ class SessionsController < ApplicationController
   def destroy
     logout
     redirect_to root_path, notice: "Signed out."
-  end
-
-  def new
   end
 
 end
@@ -676,6 +676,9 @@ rails g controller Passwords
 # app/controllers/passwords_controller.rb
 class PasswordsController < ApplicationController
   before_action :redirect_if_authenticated
+  
+  def new
+  end
 
   def create
     @user = User.find_by(email: params[:user][:email].downcase)
@@ -698,9 +701,6 @@ class PasswordsController < ApplicationController
     elsif @user.nil?
       redirect_to new_password_path, alert: "Invalid or expired token."
     end
-  end
-
-  def new
   end
 
   def update
@@ -920,12 +920,6 @@ class UsersController < ApplicationController
     ...
   end
 
-  def destroy
-    current_user.destroy
-    reset_session
-    redirect_to root_path, notice: "Your account has been deleted."
-  end
-
   def edit
     @user = current_user
   end
@@ -947,6 +941,12 @@ class UsersController < ApplicationController
       flash.now[:error] = "Incorrect password"
       render :edit, status: :unprocessable_entity
     end
+  end
+
+  def destroy
+    current_user.destroy
+    reset_session
+    redirect_to root_path, notice: "Your account has been deleted."
   end
 
   private
