@@ -13,8 +13,7 @@ class ActiveSupport::TestCase
   def current_user
     if session[:current_active_session_id].present?
       ActiveSession.find_by(id: session[:current_active_session_id])&.user
-    else
-      cookies[:remember_token].present?
+    elsif cookies[:remember_token]
       ActiveSession.find_by(remember_token: cookies[:remember_token])&.user
     end
   end
