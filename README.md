@@ -1113,8 +1113,8 @@ module Authentication
   def current_user
     Current.user ||= if session[:current_user_id].present?
       User.find_by(id: session[:current_user_id])
-    elsif cookies.permanent.encrypted[:remember_token].present?
-      User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
+    elsif cookies[:remember_token]
+      User.find_by(remember_token: cookies.encrypted[:remember_token])
     end
   end
   ...
@@ -1373,8 +1373,8 @@ module Authentication
   def current_user
     Current.user = if session[:current_active_session_id].present?
       ActiveSession.find_by(id: session[:current_active_session_id]).user
-    elsif cookies.permanent.encrypted[:remember_token].present?
-      User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
+    elsif cookies[:remember_token]
+      User.find_by(remember_token: cookies.encrypted[:remember_token])
     end
   end
   ...
@@ -1586,8 +1586,8 @@ module Authentication
   def current_user
     Current.user = if session[:current_active_session_id].present?
       ActiveSession.find_by(id: session[:current_active_session_id])&.user
-    elsif cookies.permanent.encrypted[:remember_token].present?
-      User.find_by(remember_token: cookies.permanent.encrypted[:remember_token])
+    elsif cookies[:remember_token]
+      User.find_by(remember_token: cookies.encrypted[:remember_token])
     end
   end
   ...
@@ -1675,7 +1675,7 @@ module Authentication
   end
   ...
   def remember(active_session)
-    cookies.permanent.encrypted[:remember_token] = active_session.remember_token
+    cookies.encrypted[:remember_token] = active_session.remember_token
   end
   ...
   private
@@ -1683,8 +1683,8 @@ module Authentication
   def current_user
     Current.user = if session[:current_active_session_id].present?
       ActiveSession.find_by(id: session[:current_active_session_id])&.user
-    elsif cookies.permanent.encrypted[:remember_token].present?
-      ActiveSession.find_by(remember_token: cookies.permanent.encrypted[:remember_token])&.user
+    elsif cookies[:remember_token]
+      ActiveSession.find_by(remember_token: cookies.encrypted[:remember_token])&.user
     end
   end
   ...
