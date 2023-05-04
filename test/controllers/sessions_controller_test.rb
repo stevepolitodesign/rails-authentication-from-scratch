@@ -68,7 +68,7 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
         password: @unconfirmed_user.password
       }
     }
-    assert_equal "Incorrect email or password.", flash[:alert]
+    assert_equal "Please confirm your email first.", flash[:alert]
     assert_nil current_user
     assert_redirected_to new_confirmation_path
   end
