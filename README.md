@@ -513,7 +513,7 @@ class SessionsController < ApplicationController
     @user = User.find_by(email: params[:user][:email].downcase)
     if @user
       if @user.unconfirmed?
-        redirect_to new_confirmation_path, alert: "Incorrect email or password."
+        redirect_to new_confirmation_path, alert: "Please confirm your email first."
       elsif @user.authenticate(params[:user][:password])
         login @user
         redirect_to root_path, notice: "Signed in."
@@ -1283,7 +1283,7 @@ class SessionsController < ApplicationController
     @user = User.authenticate_by(email: params[:user][:email].downcase, password: params[:user][:password])
     if @user
       if @user.unconfirmed?
-        redirect_to new_confirmation_path, alert: "Incorrect email or password."
+        redirect_to new_confirmation_path, alert: "Please confirm your email first."
       else
         after_login_path = session[:user_return_to] || root_path
         login @user
